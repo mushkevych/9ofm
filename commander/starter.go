@@ -10,7 +10,7 @@ import (
 
 var (
 	once         sync.Once
-	appSingleton *Application
+	application *Application
 )
 
 // Run is the UI entrypoint.
@@ -24,7 +24,6 @@ func Run() error {
 	defer gui.Close()
 
 	once.Do(func() {
-		var application *Application
 		application, err = NewApplication(gui)
 		if err != nil {
 			return

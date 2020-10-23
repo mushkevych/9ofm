@@ -86,14 +86,9 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 
 	var keymaps = []KeymapDetail{
 		{
-			KeyboardShortcut: "Space",
-			OnAction:         c.toggleCollapse,
-			Display:          "Collapse dir",
-		},
-		{
-			KeyboardShortcut: "Ctrl+Space",
-			OnAction:         c.toggleCollapseAll,
-			Display:          "Collapse all dir",
+			KeyboardShortcut: "Enter",
+			OnAction:         c.navigateTo,
+			Display:          "Go to",
 		},
 		{
 			KeyboardShortcut: "Ctrl+a",
@@ -165,7 +160,7 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 	return nil
 }
 
-// ResetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
+// resetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
 func (c *FileTreeController) resetCursor() {
 	_ = c.view.SetCursor(0, 0)
 	c.vm.ResetCursor()
@@ -232,28 +227,35 @@ func (c *FileTreeController) PageUp() error {
 }
 
 // getAbsPositionNode determines the selected screen cursor's location in the file tree, returning the selected FileNode.
-// func (controller *FileTreeController) getAbsPositionNode() (node *model.FileNode) {
-// 	return controller.vm.getAbsPositionNode(filterRegex())
-// }
+func (c *FileTreeController) getAbsPositionNode() (node *model.FileNode) {
+	return c.vm.GetAbsPositionNode(c.filterRegex)
+}
 
-// ToggleCollapse will collapse/expand the selected FileNode.
-func (c *FileTreeController) toggleCollapse() error {
-	err := c.vm.ToggleCollapse(c.filterRegex)
-	if err != nil {
-		return err
+// navigateTo will enter the directory
+func (c *FileTreeController) navigateTo() error {
+	fileNode := c.vm.GetAbsPositionNode(c.filterRegex)
+	if fileNode.IsDir() {
+		fqfp := fileNode.Path()
+		fileTree, err := model.ReadFileTree(fqfp)
+		if err != nil {
+			return err
+		}
+
+		c.vm, err = view.NewFileTreeView(fileTree)
+		if err != nil {
+			return err
+		}
 	}
+
 	_ = c.Update()
 	return c.Render()
 }
 
-// ToggleCollapseAll will collapse/expand the all directories.
-func (c *FileTreeController) toggleCollapseAll() error {
-	err := c.vm.ToggleCollapseAll()
+// toggleCollapse will collapse/expand the selected FileNode.
+func (c *FileTreeController) toggleCollapse() error {
+	err := c.vm.ToggleCollapse(c.filterRegex)
 	if err != nil {
 		return err
-	}
-	if c.vm.CollapseAll {
-		c.resetCursor()
 	}
 	_ = c.Update()
 	return c.Render()
@@ -270,7 +272,7 @@ func (c *FileTreeController) notifyOnViewOptionChangeListeners() error {
 	return nil
 }
 
-// ToggleAttributes will show/hide file attributes
+// toggleAttributes will show/hide file attributes
 func (c *FileTreeController) toggleAttributes() error {
 	err := c.vm.ToggleAttributes()
 	if err != nil {
@@ -290,7 +292,7 @@ func (c *FileTreeController) toggleAttributes() error {
 	return c.notifyOnViewOptionChangeListeners()
 }
 
-// ToggleShowDiffType will show/hide the selected DiffType in the model pane.
+// toggleShowDiffType will show/hide the selected DiffType in the model pane.
 func (c *FileTreeController) toggleShowDiffType(diffType model.DiffType) error {
 	c.vm.ToggleShowDiffType(diffType)
 

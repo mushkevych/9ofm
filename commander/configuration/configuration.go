@@ -3,7 +3,6 @@ package configuration
 import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
-	"github.com/mushkevych/9ofm/commander/model"
 	log "github.com/sirupsen/logrus"
 	"github.com/ufoscout/go-up"
 	"os"
@@ -34,7 +33,6 @@ func init() {
 
 		Add("diff.hide", "Modified,Added,Removed").
 
-		Add("filetree.collapse-dir", "false").
 		Add("filetree.pane-width", "0.5").
 		Add("filetree.show-attributes", "true").
 		Build()
@@ -43,7 +41,4 @@ func init() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	// set global defaults (for performance)
-	model.GlobalFileTreeCollapse = Config.GetBool("filetree.collapse-dir")
 }

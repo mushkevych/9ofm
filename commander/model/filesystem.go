@@ -5,15 +5,16 @@ import (
 	"path/filepath"
 )
 
-func ReadFileTree(startPath string) (*FileTreeModel, error) {
+// ReadFileTree reads directory specified by the fqfp (Fully Qualified File Path)
+func ReadFileTree(fqfp string) (*FileTreeModel, error) {
 	fileTree := NewFileTreeModel()
-	fileTree.Root.Name = "/"
+	fileTree.Root.Name = fqfp
 
-	err := filepath.Walk(startPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(fqfp, func(path string, info os.FileInfo, err error) error {
 		fileInfo := NewFileInfo(path, info, err)
 		fileTree.AddPath(path, fileInfo)
 
-		if fileInfo.IsDir() && path != startPath {
+		if fileInfo.IsDir() && path != fqfp {
 			return filepath.SkipDir // skip walking the directory and its contents.
 		}
 		return nil
@@ -21,5 +22,3 @@ func ReadFileTree(startPath string) (*FileTreeModel, error) {
 
 	return fileTree, err
 }
-
-

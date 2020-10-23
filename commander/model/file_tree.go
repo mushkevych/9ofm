@@ -76,19 +76,19 @@ func (tree *FileTreeModel) renderStringTreeBetween(startRow, stopRow int, showAt
 		for idx, name := range keys {
 			child := currentParams.node.Children[name]
 			// don't visit this node...
-			if child.Data.ViewInfo.Hidden || currentParams.node.Data.ViewInfo.Collapsed {
+			if child.Data.Hidden {
 				continue
 			}
 
 			// visit this node...
 			isLast := idx == (len(currentParams.node.Children) - 1)
-			showCollapsed := child.Data.ViewInfo.Collapsed && len(child.Children) > 0
+			showCollapsed := len(child.Children) > 0
 
 			// completely copy the reference slice
 			childSpaces := make([]bool, len(currentParams.childSpaces))
 			copy(childSpaces, currentParams.childSpaces)
 
-			if len(child.Children) > 0 && !child.Data.ViewInfo.Collapsed {
+			if len(child.Children) > 0 {
 				childSpaces = append(childSpaces, isLast)
 			}
 
@@ -137,13 +137,11 @@ func (tree *FileTreeModel) VisibleSize() int {
 	}
 	visitEvaluator := func(node *FileNode) bool {
 		if node.Data.FileInfo.IsDir() {
-			// we won't visit a collapsed dir, but we need to count it
-			if node.Data.ViewInfo.Collapsed {
-				size++
-			}
-			return !node.Data.ViewInfo.Collapsed && !node.Data.ViewInfo.Hidden
+			// we won't visit a directories, but we need to count it
+			size++
+			return !node.Data.Hidden
 		}
-		return !node.Data.ViewInfo.Hidden
+		return !node.Data.Hidden
 	}
 	err := tree.VisitDepthParentFirst(visitor, visitEvaluator)
 	if err != nil {

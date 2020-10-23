@@ -77,7 +77,7 @@ func (node *FileNode) renderTreeLine(spaces []bool, last bool, collapsed bool) s
 // Copy duplicates the existing node relative to a new parent node.
 func (node *FileNode) Copy(parent *FileNode) *FileNode {
 	newNode := NewNode(parent, node.Name, node.Data.FileInfo)
-	newNode.Data.ViewInfo = node.Data.ViewInfo
+	newNode.Data.Hidden = node.Data.Hidden
 	newNode.Data.DiffType = node.Data.DiffType
 	for name, child := range node.Children {
 		newNode.Children[name] = child.Copy(newNode)
@@ -231,6 +231,11 @@ func (node *FileNode) VisitDepthParentFirst(visitor Visitor, evaluator VisitEval
 // IsLeaf returns true is the current node has no child nodes.
 func (node *FileNode) IsLeaf() bool {
 	return len(node.Children) == 0
+}
+
+// IsDir returns true is the current node is a Directory
+func (node *FileNode) IsDir() bool {
+	return node.Data.FileInfo.IsDir()
 }
 
 // Path returns a slash-delimited string from the root of the greater tree to the current node (e.g. /a/path/to/here)
