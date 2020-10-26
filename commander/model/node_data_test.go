@@ -8,7 +8,7 @@ func TestAssignDiffType(t *testing.T) {
 	tree := NewFileTreeModel()
 	node, _, err := tree.AddPath("/usr", *BlankFileChangeInfo("/usr"))
 	if err != nil {
-		t.Errorf("Expected no error from fetching path. got: %v", err)
+		t.Errorf("Expected no error from fetching absPath. got: %v", err)
 	}
 	node.Data.DiffType = Modified
 	if tree.Root.Children["usr"].Data.DiffType != Modified {

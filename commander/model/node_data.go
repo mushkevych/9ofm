@@ -16,11 +16,11 @@ func NewNodeData() *NodeData {
 	}
 }
 
-// Copy duplicates a NodeData
-func (data *NodeData) Copy() *NodeData {
+// Clone duplicates a NodeData
+func (data *NodeData) Clone() *NodeData {
 	return &NodeData{
 		Hidden:   data.Hidden,
-		FileInfo: *data.FileInfo.Copy(),
+		FileInfo: *data.FileInfo.Clone(),
 		DiffType: data.DiffType,
 	}
 }

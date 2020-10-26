@@ -57,8 +57,8 @@ func (info *FileInfo) IsDir() bool {
 	return info.Mode.IsDir()
 }
 
-// Copy clones a FileInfo
-func (info *FileInfo) Copy() *FileInfo {
+// Clone clones given FileInfo
+func (info *FileInfo) Clone() *FileInfo {
 	if info == nil {
 		return nil
 	}

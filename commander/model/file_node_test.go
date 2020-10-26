@@ -87,9 +87,9 @@ func TestPath(t *testing.T) {
 	tree := NewFileTreeModel()
 	node, _, _ := tree.AddPath(expected, FileInfo{})
 
-	actual := node.Path()
+	actual := node.AbsPath()
 	if expected != actual {
-		t.Errorf("Expected path '%s' got '%s'", expected, actual)
+		t.Errorf("Expected absPath '%s' got '%s'", expected, actual)
 	}
 }
 

@@ -164,8 +164,8 @@ func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) s
 	return tree.renderStringTreeBetween(start, stop, showAttributes)
 }
 
-// Copy returns a copy of the given FileTreeModel
-func (tree *FileTreeModel) Copy() *FileTreeModel {
+// Clone returns a copy of the given FileTreeModel
+func (tree *FileTreeModel) Clone() *FileTreeModel {
 	newTree := NewFileTreeModel()
 	newTree.Size = tree.Size
 	newTree.FileSize = tree.FileSize
@@ -200,7 +200,7 @@ func (tree *FileTreeModel) VisitDepthParentFirst(visitor Visitor, evaluator Visi
 	return tree.Root.VisitDepthParentFirst(visitor, evaluator)
 }
 
-// GetNode fetches a single node when given a slash-delimited string from root ('/') to the desired node (e.g. '/a/node/path')
+// GetNode fetches a single node when given a slash-delimited string from root ('/') to the desired node (e.g. '/a/node/absPath')
 func (tree *FileTreeModel) GetNode(path string) (*FileNode, error) {
 	nodeNames := strings.Split(strings.Trim(path, "/"), "/")
 	node := tree.Root
@@ -209,7 +209,7 @@ func (tree *FileTreeModel) GetNode(path string) (*FileNode, error) {
 			continue
 		}
 		if node.Children[name] == nil {
-			return nil, fmt.Errorf("path does not exist: %s", path)
+			return nil, fmt.Errorf("absPath does not exist: %s", path)
 		}
 		node = node.Children[name]
 	}
@@ -220,7 +220,7 @@ func (tree *FileTreeModel) GetNode(path string) (*FileNode, error) {
 func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, []*FileNode, error) {
 	filepath = path.Clean(filepath)
 	if filepath == "." {
-		return nil, nil, fmt.Errorf("cannot add relative path '%s'", filepath)
+		return nil, nil, fmt.Errorf("cannot add relative absPath '%s'", filepath)
 	}
 	nodeNames := strings.Split(strings.Trim(filepath, "/"), "/")
 	node := tree.Root
@@ -234,13 +234,13 @@ func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, [
 			node = node.Children[name]
 		} else {
 			// don't attach the payload. The payload is destined for the
-			// Path's end node, not any intermediary node.
+			// AbsPath's end node, not any intermediary node.
 			node = node.AddChild(name, FileInfo{})
 			addedNodes = append(addedNodes, node)
 
 			if node == nil {
 				// the child could not be added
-				return node, addedNodes, fmt.Errorf(fmt.Sprintf("could not add child node: '%s' (path:'%s')", name, filepath))
+				return node, addedNodes, fmt.Errorf(fmt.Sprintf("could not add child node: '%s' (absPath:'%s')", name, filepath))
 			}
 		}
 
@@ -253,7 +253,7 @@ func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, [
 	return node, addedNodes, nil
 }
 
-// RemovePath removes a node from the tree given its path.
+// RemovePath removes a node from the tree given its absPath.
 func (tree *FileTreeModel) RemovePath(path string) error {
 	node, err := tree.GetNode(path)
 	if err != nil {
@@ -280,12 +280,12 @@ func (tree *FileTreeModel) CompareAndMark(upper *FileTreeModel) ([]PathError, er
 	graft := func(upperNode *FileNode) error {
 		// note: since we are not comparing against the original tree (copying the tree is expensive) we may mark the parent
 		// of an added node incorrectly as modified. This will be corrected later.
-		originalLowerNode, _ := originalTree.GetNode(upperNode.Path())
+		originalLowerNode, _ := originalTree.GetNode(upperNode.AbsPath())
 
 		if originalLowerNode == nil {
-			_, newNodes, err := tree.AddPath(upperNode.Path(), upperNode.Data.FileInfo)
+			_, newNodes, err := tree.AddPath(upperNode.AbsPath(), upperNode.Data.FileInfo)
 			if err != nil {
-				failed = append(failed, NewPathError(upperNode.Path(), ActionAdd, err))
+				failed = append(failed, NewPathError(upperNode.AbsPath(), ActionAdd, err))
 				return nil
 			}
 			for idx := len(newNodes) - 1; idx >= 0; idx-- {
@@ -296,7 +296,7 @@ func (tree *FileTreeModel) CompareAndMark(upper *FileTreeModel) ([]PathError, er
 		}
 
 		// the file exists in the lower layer
-		lowerNode, _ := tree.GetNode(upperNode.Path())
+		lowerNode, _ := tree.GetNode(upperNode.AbsPath())
 		diffType := lowerNode.compare(upperNode)
 		modifications = append(modifications, compareMark{lowerNode: lowerNode, upperNode: upperNode, tentative: diffType, final: -1})
 
@@ -323,12 +323,12 @@ func (tree *FileTreeModel) CompareAndMark(upper *FileTreeModel) ([]PathError, er
 		}
 
 		// persist the upper's payload on the owning tree
-		pair.lowerNode.Data.FileInfo = *pair.upperNode.Data.FileInfo.Copy()
+		pair.lowerNode.Data.FileInfo = *pair.upperNode.Data.FileInfo.Clone()
 	}
 	return failed, nil
 }
 
-// markRemoved annotates the FileNode at the given path as Removed.
+// markRemoved annotates the FileNode at the given absPath as Removed.
 func (tree *FileTreeModel) markRemoved(path string) error {
 	node, err := tree.GetNode(path)
 	if err != nil {
@@ -340,9 +340,9 @@ func (tree *FileTreeModel) markRemoved(path string) error {
 // Stack takes two trees and combines them together. This is done by "stacking" the given tree on top of the owning tree.
 func (tree *FileTreeModel) Stack(upper *FileTreeModel) (failed []PathError, stackErr error) {
 	graft := func(node *FileNode) error {
-		_, _, err := tree.AddPath(node.Path(), node.Data.FileInfo)
+		_, _, err := tree.AddPath(node.AbsPath(), node.Data.FileInfo)
 		if err != nil {
-			failed = append(failed, NewPathError(node.Path(), ActionRemove, err))
+			failed = append(failed, NewPathError(node.AbsPath(), ActionRemove, err))
 		}
 		return nil
 	}
@@ -353,7 +353,7 @@ func (tree *FileTreeModel) Stack(upper *FileTreeModel) (failed []PathError, stac
 // StackTreeRange combines an array of trees into a single tree
 func StackTreeRange(trees []*FileTreeModel, start, stop int) (*FileTreeModel, []PathError, error) {
 	errors := make([]PathError, 0)
-	tree := trees[0].Copy()
+	tree := trees[0].Clone()
 	for idx := start; idx <= stop; idx++ {
 		failedPaths, err := tree.Stack(trees[idx])
 		if len(failedPaths) > 0 {

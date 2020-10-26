@@ -71,7 +71,7 @@ func (c *FxxController) Setup(view *gocui.View) error {
 		{
 			KeyboardShortcut: "F5",
 			OnAction:         c.dummy,
-			Display:          "Copy",
+			Display:          "Clone",
 		},
 		{
 			KeyboardShortcut: "F6",

@@ -16,7 +16,7 @@ func stringInSlice(a string, list []string) bool {
 
 func AssertDiffType(node *FileNode, expectedDiffType DiffType) error {
 	if node.Data.DiffType != expectedDiffType {
-		return fmt.Errorf("expecting node at %s to have DiffType %v, but had %v", node.Path(), expectedDiffType, node.Data.DiffType)
+		return fmt.Errorf("expecting node at %s to have DiffType %v, but had %v", node.AbsPath(), expectedDiffType, node.Data.DiffType)
 	}
 	return nil
 }
@@ -134,7 +134,7 @@ func TestRejectPurelyRelativePath(t *testing.T) {
 	_, _, err = tree.AddPath("./", FileInfo{})
 
 	if err == nil {
-		t.Errorf("expected to reject relative path, but did not")
+		t.Errorf("expected to reject relative absPath, but did not")
 	}
 
 }
@@ -424,7 +424,7 @@ func TestCopy(t *testing.T) {
         └── systemd
 `
 
-	NewFileTree := tree.Copy()
+	NewFileTree := tree.Clone()
 	actual := NewFileTree.String(false)
 
 	if expected != actual {
@@ -461,11 +461,11 @@ func TestCompareWithNoChanges(t *testing.T) {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
 	asserter := func(n *FileNode) error {
-		if n.Path() == "/" {
+		if n.AbsPath() == "/" {
 			return nil
 		}
 		if (n.Data.DiffType) != Unmodified {
-			t.Errorf("Expecting node at %s to have DiffType unchanged, but had %v", n.Path(), n.Data.DiffType)
+			t.Errorf("Expecting node at %s to have DiffType unchanged, but had %v", n.AbsPath(), n.Data.DiffType)
 		}
 		return nil
 	}
@@ -479,7 +479,7 @@ func TestCompareWithAdds(t *testing.T) {
 	lowerTree := NewFileTreeModel()
 	upperTree := NewFileTreeModel()
 	lowerPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin"}
-	upperPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/a/new/path"}
+	upperPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/a/new/absPath"}
 
 	for _, value := range lowerPaths {
 		_, _, err := lowerTree.AddPath(value, FileInfo{
@@ -513,10 +513,10 @@ func TestCompareWithAdds(t *testing.T) {
 	}
 	asserter := func(n *FileNode) error {
 
-		p := n.Path()
+		p := n.AbsPath()
 		if p == "/" {
 			return nil
-		} else if stringInSlice(p, []string{"/usr/bin/bash", "/a", "/a/new", "/a/new/path"}) {
+		} else if stringInSlice(p, []string{"/usr/bin/bash", "/a", "/a/new", "/a/new/absPath"}) {
 			if err := AssertDiffType(n, Added); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
@@ -626,7 +626,7 @@ func TestCompareWithChanges(t *testing.T) {
 	}
 	failedAssertions := []error{}
 	asserter := func(n *FileNode) error {
-		p := n.Path()
+		p := n.AbsPath()
 		if p == "/" {
 			return nil
 		} else if stringInSlice(p, changedPaths) {
@@ -693,7 +693,7 @@ func TestCompareWithRemoves(t *testing.T) {
 	}
 	failedAssertions := []error{}
 	asserter := func(n *FileNode) error {
-		p := n.Path()
+		p := n.AbsPath()
 		if p == "/" {
 			return nil
 		} else if stringInSlice(p, []string{"/etc", "/usr/bin", "/etc/hosts", "/etc/sudoers", "/root/example/some1", "/root/example/some2", "/root/example"}) {
@@ -811,14 +811,14 @@ func TestRemoveOnIterate(t *testing.T) {
 			hash: 123,
 		}
 		node, _, err := tree.AddPath(value, fakeData)
-		if err == nil && stringInSlice(node.Path(), []string{"/etc"}) {
+		if err == nil && stringInSlice(node.AbsPath(), []string{"/etc"}) {
 			node.Data.ViewInfo.Hidden = true
 		}
 	}
 
 	err := tree.VisitDepthChildFirst(func(node *FileNode) error {
 		if node.Data.ViewInfo.Hidden {
-			err := tree.RemovePath(node.Path())
+			err := tree.RemovePath(node.AbsPath())
 			if err != nil {
 				t.Errorf("could not setup test: %v", err)
 			}

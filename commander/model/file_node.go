@@ -2,15 +2,13 @@ package model
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"sort"
-	"strings"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
-	"github.com/phayes/permbits"	// plan9 incompatible
+	"github.com/phayes/permbits" // plan9 incompatible
 )
 
 const (
@@ -31,20 +29,29 @@ type FileNode struct {
 	Name     string
 	Data     NodeData
 	Children map[string]*FileNode
-	path     string
+	absPath  string
 }
 
 // NewNode creates a new FileNode relative to the given parent node with a payload.
-func NewNode(parent *FileNode, name string, data FileInfo) (node *FileNode) {
+func NewNode(parent *FileNode, absPath string, name string, data FileInfo) (node *FileNode) {
+	if absPath == "" && (name == "." || name == "..") {
+		log.Fatal("Absolute Path must be provided for . and .. files")
+	}
+
 	node = new(FileNode)
 	node.Name = name
 	node.Data = *NewNodeData()
-	node.Data.FileInfo = *data.Copy()
+	node.Data.FileInfo = *data.Clone()
 
 	node.Children = make(map[string]*FileNode)
 	node.Parent = parent
 	if parent != nil {
 		node.Tree = parent.Tree
+	}
+
+	node.absPath = absPath
+	if node.absPath == "" {
+		node.absPath = node.buildAbsPath()
 	}
 
 	return node
@@ -76,7 +83,7 @@ func (node *FileNode) renderTreeLine(spaces []bool, last bool, collapsed bool) s
 
 // Copy duplicates the existing node relative to a new parent node.
 func (node *FileNode) Copy(parent *FileNode) *FileNode {
-	newNode := NewNode(parent, node.Name, node.Data.FileInfo)
+	newNode := NewNode(parent, "", node.Name, node.Data.FileInfo)
 	newNode.Data.Hidden = node.Data.Hidden
 	newNode.Data.DiffType = node.Data.DiffType
 	for name, child := range node.Children {
@@ -88,10 +95,10 @@ func (node *FileNode) Copy(parent *FileNode) *FileNode {
 
 // AddChild creates a new node relative to the current FileNode.
 func (node *FileNode) AddChild(name string, data FileInfo) (child *FileNode) {
-	child = NewNode(node, name, data)
+	child = NewNode(node, "", name, data)
 	if node.Children[name] != nil {
 		// tree node already exists, replace the payload, keep the children
-		node.Children[name].Data.FileInfo = *data.Copy()
+		node.Children[name].Data.FileInfo = *data.Clone()
 	} else {
 		node.Children[name] = child
 		node.Tree.Size++
@@ -130,7 +137,7 @@ func (node *FileNode) String() string {
 	return diffTypeColor[node.Data.DiffType].Sprint(display)
 }
 
-// MetadatString returns the FileNode metadata in a columnar string.
+// MetadataString returns the FileNode metadata in a columnar string.
 func (node *FileNode) MetadataString() string {
 	if node == nil {
 		return ""
@@ -238,23 +245,22 @@ func (node *FileNode) IsDir() bool {
 	return node.Data.FileInfo.IsDir()
 }
 
-// Path returns a slash-delimited string from the root of the greater tree to the current node (e.g. /a/path/to/here)
-func (node *FileNode) Path() string {
-	if node.path == "" {
-		var path []string
-		curNode := node
-		for {
-			if curNode.Parent == nil {
-				break
-			}
+// AbsPath returns a slash-delimited absolute absPath of the given file
+func (node *FileNode) AbsPath() string {
+	return node.absPath
+}
 
-			name := curNode.Name
-			path = append([]string{name}, path...)
-			curNode = curNode.Parent
+// discoverPath rebuilds slash-delimited absolute absPath of the given file by iterating over its Parental nodes
+func (node *FileNode) buildAbsPath() string {
+	var fqfpParent string
+	if node.Parent != nil {
+		// ask Parent for its AbsPath
+		fqfpParent = node.Parent.AbsPath()
+		if node.Parent.AbsPath() != "/" {
+			fqfpParent += string(os.PathSeparator)
 		}
-		node.path = "/" + strings.Join(path, "/")
 	}
-	return strings.Replace(node.path, "//", "/", -1)
+	return fqfpParent + node.Name
 }
 
 // deriveDiffType determines a DiffType to the current FileNode. Note: the DiffType of a node is always the DiffType of

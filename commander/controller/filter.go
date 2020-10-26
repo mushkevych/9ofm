@@ -35,7 +35,7 @@ func NewFilterController(gui *gocui.Gui) (controller *FilterController) {
 	// populate main fields
 	controller.name = "filter"
 	controller.gui = gui
-	controller.labelStr = "Path FilterController: "
+	controller.labelStr = "AbsPath FilterController: "
 	controller.isVisible = false
 
 	controller.requestedHeight = 1

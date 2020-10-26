@@ -12,7 +12,7 @@ type KeymapDetail struct {
 	// hence we need to provide and keep "human readable keyboard shortcut" such as "ctrl+m"
 	KeyboardShortcut string
 
-	// Display represents name of the action shown to the user. For instance: Copy, Quit, Edit
+	// Display represents name of the action shown to the user. For instance: Clone, Quit, Edit
 	Display string
 
 	OnAction   func() error
@@ -28,7 +28,7 @@ func RegisterKeymaps(gui *gocui.Gui, viewname string, keymaps []KeymapDetail) er
 
 		// a keymap deep copy is required, as otherwise `keymap.onAction` pointer
 		// is recycled and points to the last element of the loop
-		var kmCopy = keymap.deepCopy()
+		var kmCopy = keymap.Clone()
 		if err := gui.SetKeybinding(viewname, key.Value, key.Modifier, kmCopy.onAction); err != nil {
 			return err
 		}
@@ -36,7 +36,7 @@ func RegisterKeymaps(gui *gocui.Gui, viewname string, keymaps []KeymapDetail) er
 	return nil
 }
 
-func (km *KeymapDetail) deepCopy() KeymapDetail {
+func (km *KeymapDetail) Clone() KeymapDetail {
 	return KeymapDetail{
 		KeyboardShortcut: km.KeyboardShortcut,
 		Display:          km.Display,

@@ -235,7 +235,7 @@ func (c *FileTreeController) getAbsPositionNode() (node *model.FileNode) {
 func (c *FileTreeController) navigateTo() error {
 	fileNode := c.vm.GetAbsPositionNode(c.filterRegex)
 	if fileNode.IsDir() {
-		fqfp := fileNode.Path()
+		fqfp := fileNode.AbsPath()
 		fileTree, err := model.ReadFileTree(fqfp)
 		if err != nil {
 			return err

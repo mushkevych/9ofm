@@ -98,7 +98,7 @@ func (c *DetailsController) Render() error {
 	log.Tracef("controller.Render() %s", c.Name())
 
 	template := "%5s  %12s  %-s\n"
-	inefficiencyReport := fmt.Sprintf(format.Header(template), "Count", "Total Space", "Path")
+	inefficiencyReport := fmt.Sprintf(format.Header(template), "Count", "Total Space", "AbsPath")
 
 	c.gui.Update(func(g *gocui.Gui) error {
 		if c.header == nil {
