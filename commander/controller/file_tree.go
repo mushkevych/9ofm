@@ -21,7 +21,7 @@ type FileTreeController struct {
 	gui    *gocui.Gui
 	view   *gocui.View
 	header *gocui.View
-	vm     *view.FileTreeView
+	ftv    *view.FileTreeView
 	title  string
 
 	filterRegex         *regexp.Regexp
@@ -38,7 +38,7 @@ func NewFileTreeController(gui *gocui.Gui, name string, fileTree *model.FileTree
 	// populate main fields
 	controller.name = name
 	controller.gui = gui
-	controller.vm, err = view.NewFileTreeView(fileTree)
+	controller.ftv, err = view.NewFileTreeView(fileTree)
 	if err != nil {
 		return nil, err
 	}
@@ -93,31 +93,31 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 		{
 			KeyboardShortcut: "Ctrl+a",
 			OnAction:   func() error { return c.toggleShowDiffType(model.Added) },
-			IsSelected: func() bool { return !c.vm.HiddenDiffTypes[model.Added] },
+			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Added] },
 			Display:    "Added",
 		},
 		{
 			KeyboardShortcut: "Ctrl+r",
 			OnAction:   func() error { return c.toggleShowDiffType(model.Removed) },
-			IsSelected: func() bool { return !c.vm.HiddenDiffTypes[model.Removed] },
+			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Removed] },
 			Display:    "Removed",
 		},
 		{
 			KeyboardShortcut: "Ctrl+m",
 			OnAction:   func() error { return c.toggleShowDiffType(model.Modified) },
-			IsSelected: func() bool { return !c.vm.HiddenDiffTypes[model.Modified] },
+			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Modified] },
 			Display:    "Modified",
 		},
 		{
 			KeyboardShortcut: "Ctrl+u",
 			OnAction:   func() error { return c.toggleShowDiffType(model.Unmodified) },
-			IsSelected: func() bool { return !c.vm.HiddenDiffTypes[model.Unmodified] },
+			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Unmodified] },
 			Display:    "Unmodified",
 		},
 		{
 			KeyboardShortcut: "Ctrl+b",
 			OnAction:         c.toggleAttributes,
-			IsSelected:       func() bool { return c.vm.ShowAttributes },
+			IsSelected:       func() bool { return c.ftv.ShowFileAttributes },
 			Display:          "Attributes",
 		},
 		{
@@ -153,7 +153,7 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 	c.keymaps = keymaps
 
 	_, height := c.view.Size()
-	c.vm.Setup(0, height)
+	c.ftv.Setup(0, height)
 	_ = c.Update()
 	_ = c.Render()
 
@@ -163,7 +163,7 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 // resetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
 func (c *FileTreeController) resetCursor() {
 	_ = c.view.SetCursor(0, 0)
-	c.vm.ResetCursor()
+	c.ftv.ResetCursor()
 }
 
 // CursorDown moves the cursor down and renders the controller.
@@ -171,7 +171,7 @@ func (c *FileTreeController) resetCursor() {
 // Instead we are keeping an upper and lower bounds of the tree string to render and only flushing
 // this range into the controller buffer. This is much faster when tree sizes are large.
 func (c *FileTreeController) CursorDown() error {
-	if c.vm.CursorDown() {
+	if c.ftv.CursorDown() {
 		return c.Render()
 	}
 	return nil
@@ -182,7 +182,7 @@ func (c *FileTreeController) CursorDown() error {
 // Instead we are keeping an upper and lower bounds of the tree string to render and only flushing
 // this range into the controller buffer. This is much faster when tree sizes are large.
 func (c *FileTreeController) CursorUp() error {
-	if c.vm.CursorUp() {
+	if c.ftv.CursorUp() {
 		return c.Render()
 	}
 	return nil
@@ -190,7 +190,7 @@ func (c *FileTreeController) CursorUp() error {
 
 // CursorLeft moves the cursor up until we reach the Parent Node or top of the tree
 func (c *FileTreeController) CursorLeft() error {
-	err := c.vm.CursorLeft(c.filterRegex)
+	err := c.ftv.CursorLeft(c.filterRegex)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (c *FileTreeController) CursorLeft() error {
 
 // CursorRight descends into directory expanding it if needed
 func (c *FileTreeController) CursorRight() error {
-	err := c.vm.CursorRight(c.filterRegex)
+	err := c.ftv.CursorRight(c.filterRegex)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (c *FileTreeController) CursorRight() error {
 
 // PageDown moves to next page putting the cursor on top
 func (c *FileTreeController) PageDown() error {
-	err := c.vm.PageDown()
+	err := c.ftv.PageDown()
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func (c *FileTreeController) PageDown() error {
 
 // PageUp moves to previous page putting the cursor on top
 func (c *FileTreeController) PageUp() error {
-	err := c.vm.PageUp()
+	err := c.ftv.PageUp()
 	if err != nil {
 		return err
 	}
@@ -228,12 +228,12 @@ func (c *FileTreeController) PageUp() error {
 
 // getAbsPositionNode determines the selected screen cursor's location in the file tree, returning the selected FileNode.
 func (c *FileTreeController) getAbsPositionNode() (node *model.FileNode) {
-	return c.vm.GetAbsPositionNode(c.filterRegex)
+	return c.ftv.GetAbsPositionNode(c.filterRegex)
 }
 
 // navigateTo will enter the directory
 func (c *FileTreeController) navigateTo() error {
-	fileNode := c.vm.GetAbsPositionNode(c.filterRegex)
+	fileNode := c.ftv.GetAbsPositionNode(c.filterRegex)
 	if fileNode.IsDir() {
 		fqfp := fileNode.AbsPath()
 		fileTree, err := model.ReadFileTree(fqfp)
@@ -241,7 +241,7 @@ func (c *FileTreeController) navigateTo() error {
 			return err
 		}
 
-		c.vm, err = view.NewFileTreeView(fileTree)
+		c.ftv, err = view.NewFileTreeView(fileTree)
 		if err != nil {
 			return err
 		}
@@ -253,7 +253,7 @@ func (c *FileTreeController) navigateTo() error {
 
 // toggleCollapse will collapse/expand the selected FileNode.
 func (c *FileTreeController) toggleCollapse() error {
-	err := c.vm.ToggleCollapse(c.filterRegex)
+	err := c.ftv.ToggleCollapse(c.filterRegex)
 	if err != nil {
 		return err
 	}
@@ -274,7 +274,7 @@ func (c *FileTreeController) notifyOnViewOptionChangeListeners() error {
 
 // toggleAttributes will show/hide file attributes
 func (c *FileTreeController) toggleAttributes() error {
-	err := c.vm.ToggleAttributes()
+	err := c.ftv.ToggleAttributes()
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (c *FileTreeController) toggleAttributes() error {
 
 // toggleShowDiffType will show/hide the selected DiffType in the model pane.
 func (c *FileTreeController) toggleShowDiffType(diffType model.DiffType) error {
-	c.vm.ToggleShowDiffType(diffType)
+	c.ftv.ToggleShowDiffType(diffType)
 
 	err := c.Update()
 	if err != nil {
@@ -320,7 +320,7 @@ func (c *FileTreeController) Update() error {
 		width, height = c.gui.Size()
 	}
 	// height should account for the header
-	return c.vm.Update(c.filterRegex, width, height-1)
+	return c.ftv.Update(c.filterRegex, width, height-1)
 }
 
 // Render flushes the state objects (file tree) to the pane.
@@ -340,18 +340,18 @@ func (c *FileTreeController) Render() error {
 		c.header.Clear()
 		width, _ := g.Size()
 		headerStr := format.FmtHeader(title, width, isSelected)
-		if c.vm.ShowAttributes {
+		if c.ftv.ShowFileAttributes {
 			headerStr += fmt.Sprintf(model.AttributeFormat+" %s", "P", "ermission", "UID:GID", "Size", "Filetree")
 		}
 		_, _ = fmt.Fprintln(c.header, headerStr)
 
 		// update the contents
 		c.view.Clear()
-		err := c.vm.Render()
+		err := c.ftv.Render()
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprint(c.view, c.vm.Buffer.String())
+		_, err = fmt.Fprint(c.view, c.ftv.Buffer.String())
 
 		return err
 	})
@@ -393,12 +393,12 @@ func (c *FileTreeController) Layout(g *gocui.Gui, minX, minY, maxX, maxY int) er
 	// make the layout responsive to the available realestate. Make more room for the main content by hiding auxillary
 	// content when there is not enough room
 	if maxX-minX < 60 {
-		c.vm.ConstrainLayout()
+		c.ftv.ConstrainLayout()
 	} else {
-		c.vm.ExpandLayout()
+		c.ftv.ExpandLayout()
 	}
 
-	if c.vm.ShowAttributes {
+	if c.ftv.ShowFileAttributes {
 		attributeRowSize = 1
 	}
 

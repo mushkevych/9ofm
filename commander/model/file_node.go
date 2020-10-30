@@ -26,16 +26,17 @@ var diffTypeColor = map[DiffType]*color.Color{
 type FileNode struct {
 	Tree     *FileTreeModel
 	Parent   *FileNode
-	Name     string
-	Data     NodeData
 	Children map[string]*FileNode
-	absPath  string
+	Data     NodeData
+
+	Name string
+	fqfp string
 }
 
-// NewNode creates a new FileNode relative to the given parent node with a payload.
-func NewNode(parent *FileNode, absPath string, name string, data FileInfo) (node *FileNode) {
-	if absPath == "" && (name == "." || name == "..") {
-		log.Fatal("Absolute Path must be provided for . and .. files")
+// NewFileNode creates a new FileNode relative to the given parent node with a payload.
+func NewFileNode(parent *FileNode, fqfp string, name string, data FileInfo) (node *FileNode) {
+	if fqfp == "" && (name == "." || name == "..") {
+		log.Fatal("Absolute path must be provided for . and .. files")
 	}
 
 	node = new(FileNode)
@@ -49,41 +50,17 @@ func NewNode(parent *FileNode, absPath string, name string, data FileInfo) (node
 		node.Tree = parent.Tree
 	}
 
-	node.absPath = absPath
-	if node.absPath == "" {
-		node.absPath = node.buildAbsPath()
+	node.fqfp = fqfp
+	if node.fqfp == "" {
+		node.fqfp = node.buildAbsPath()
 	}
 
 	return node
 }
 
-// renderTreeLine returns a string representing this FileNode in the context of a greater ASCII tree.
-func (node *FileNode) renderTreeLine(spaces []bool, last bool, collapsed bool) string {
-	var otherBranches string
-	for _, space := range spaces {
-		if space {
-			otherBranches += noBranchSpace
-		} else {
-			otherBranches += branchSpace
-		}
-	}
-
-	thisBranch := middleItem
-	if last {
-		thisBranch = lastItem
-	}
-
-	collapsedIndicator := uncollapsedItem
-	if collapsed {
-		collapsedIndicator = collapsedItem
-	}
-
-	return otherBranches + thisBranch + collapsedIndicator + node.String() + newLine
-}
-
 // Copy duplicates the existing node relative to a new parent node.
 func (node *FileNode) Copy(parent *FileNode) *FileNode {
-	newNode := NewNode(parent, "", node.Name, node.Data.FileInfo)
+	newNode := NewFileNode(parent, "", node.Name, node.Data.FileInfo)
 	newNode.Data.Hidden = node.Data.Hidden
 	newNode.Data.DiffType = node.Data.DiffType
 	for name, child := range node.Children {
@@ -95,7 +72,7 @@ func (node *FileNode) Copy(parent *FileNode) *FileNode {
 
 // AddChild creates a new node relative to the current FileNode.
 func (node *FileNode) AddChild(name string, data FileInfo) (child *FileNode) {
-	child = NewNode(node, "", name, data)
+	child = NewFileNode(node, "", name, data)
 	if node.Children[name] != nil {
 		// tree node already exists, replace the payload, keep the children
 		node.Children[name].Data.FileInfo = *data.Clone()
@@ -245,12 +222,12 @@ func (node *FileNode) IsDir() bool {
 	return node.Data.FileInfo.IsDir()
 }
 
-// AbsPath returns a slash-delimited absolute absPath of the given file
+// AbsPath returns a slash-delimited absolute fqfp of the given file
 func (node *FileNode) AbsPath() string {
-	return node.absPath
+	return node.fqfp
 }
 
-// discoverPath rebuilds slash-delimited absolute absPath of the given file by iterating over its Parental nodes
+// buildAbsPath rebuilds slash-delimited absolute path of the given file by iterating over its Parental nodes
 func (node *FileNode) buildAbsPath() string {
 	var fqfpParent string
 	if node.Parent != nil {

@@ -134,7 +134,7 @@ func TestRejectPurelyRelativePath(t *testing.T) {
 	_, _, err = tree.AddPath("./", FileInfo{})
 
 	if err == nil {
-		t.Errorf("expected to reject relative absPath, but did not")
+		t.Errorf("expected to reject relative fqfp, but did not")
 	}
 
 }
@@ -286,7 +286,7 @@ func TestRemovePath(t *testing.T) {
 func TestStack(t *testing.T) {
 	payloadKey := "/var/run/systemd"
 	payloadValue := FileInfo{
-		Path: "yup",
+		Fqfp: "yup",
 	}
 
 	tree1 := NewFileTreeModel()
@@ -366,7 +366,7 @@ func TestStack(t *testing.T) {
 		t.Errorf("Expected '%s' to still exist, but it doesn't", payloadKey)
 	}
 
-	if node == nil || node.Data.FileInfo.Path != payloadValue.Path {
+	if node == nil || node.Data.FileInfo.Fqfp != payloadValue.Fqfp {
 		t.Errorf("Expected '%s' value to be %+v but got %+v", payloadKey, payloadValue, node.Data.FileInfo)
 	}
 
@@ -440,7 +440,7 @@ func TestCompareWithNoChanges(t *testing.T) {
 
 	for _, value := range paths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}
@@ -479,11 +479,11 @@ func TestCompareWithAdds(t *testing.T) {
 	lowerTree := NewFileTreeModel()
 	upperTree := NewFileTreeModel()
 	lowerPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin"}
-	upperPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/a/new/absPath"}
+	upperPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/a/new/fqfp"}
 
 	for _, value := range lowerPaths {
 		_, _, err := lowerTree.AddPath(value, FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		})
@@ -494,7 +494,7 @@ func TestCompareWithAdds(t *testing.T) {
 
 	for _, value := range upperPaths {
 		_, _, err := upperTree.AddPath(value, FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		})
@@ -516,7 +516,7 @@ func TestCompareWithAdds(t *testing.T) {
 		p := n.AbsPath()
 		if p == "/" {
 			return nil
-		} else if stringInSlice(p, []string{"/usr/bin/bash", "/a", "/a/new", "/a/new/absPath"}) {
+		} else if stringInSlice(p, []string{"/usr/bin/bash", "/a", "/a/new", "/a/new/fqfp"}) {
 			if err := AssertDiffType(n, Added); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
@@ -552,7 +552,7 @@ func TestCompareWithChanges(t *testing.T) {
 
 	for _, value := range changedPaths {
 		_, _, err := lowerTree.AddPath(value, FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		})
@@ -560,7 +560,7 @@ func TestCompareWithChanges(t *testing.T) {
 			t.Errorf("could not setup test: %v", err)
 		}
 		_, _, err = upperTree.AddPath(value, FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 456,
 		})
@@ -572,7 +572,7 @@ func TestCompareWithChanges(t *testing.T) {
 	chmodPath := "/etc/non-data-change"
 
 	_, _, err := lowerTree.AddPath(chmodPath, FileInfo{
-		Path: chmodPath,
+		Fqfp: chmodPath,
 		Mode: 0, // regular file
 		hash: 123,
 	})
@@ -581,7 +581,7 @@ func TestCompareWithChanges(t *testing.T) {
 	}
 
 	_, _, err = upperTree.AddPath(chmodPath, FileInfo{
-		Path: chmodPath,
+		Fqfp: chmodPath,
 		Mode: 0, // regular file
 		hash: 123,
 	})
@@ -594,7 +594,7 @@ func TestCompareWithChanges(t *testing.T) {
 	chownPath := "/etc/non-data-change-2"
 
 	_, _, err = lowerTree.AddPath(chmodPath, FileInfo{
-		Path: chownPath,
+		Fqfp: chownPath,
 		Mode: 0, // regular file,
 		hash: 123,
 		Gid:  0,
@@ -605,7 +605,7 @@ func TestCompareWithChanges(t *testing.T) {
 	}
 
 	_, _, err = upperTree.AddPath(chmodPath, FileInfo{
-		Path: chownPath,
+		Fqfp: chownPath,
 		Mode: 0, // regular file
 		hash: 123,
 		Gid:  12,
@@ -662,7 +662,7 @@ func TestCompareWithRemoves(t *testing.T) {
 
 	for _, value := range lowerPaths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}
@@ -674,7 +674,7 @@ func TestCompareWithRemoves(t *testing.T) {
 
 	for _, value := range upperPaths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}
@@ -768,7 +768,7 @@ func TestStackRange(t *testing.T) {
 
 	for _, value := range lowerPaths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}
@@ -780,7 +780,7 @@ func TestStackRange(t *testing.T) {
 
 	for _, value := range upperPaths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 456,
 		}
@@ -806,7 +806,7 @@ func TestRemoveOnIterate(t *testing.T) {
 
 	for _, value := range paths {
 		fakeData := FileInfo{
-			Path: value,
+			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}

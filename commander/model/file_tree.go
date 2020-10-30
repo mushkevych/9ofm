@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"github.com/mushkevych/9ofm/utils"
 	"path"
 	"sort"
 	"strings"
@@ -11,22 +12,23 @@ import (
 )
 
 const (
-	newLine              = "\n"
-	noBranchSpace        = "    "
-	branchSpace          = "│   "
-	middleItem           = "├─"
-	lastItem             = "└─"
-	uncollapsedItem      = "─ "
-	collapsedItem        = "⊕ "
+	newLine         = "\n"
 )
 
 // FileTreeModel represents a set of files, directories, and their relations.
 type FileTreeModel struct {
-	Root     *FileNode
-	Size     int
-	FileSize uint64
-	Name     string
-	Id       uuid.UUID
+	// absolute root of the filesystem
+	Root *FileNode
+
+	// parent working directory - File Panel is build from this point
+	pwd *FileNode
+
+	// number of files in this Tree
+	// NOTE: this number is different from the len(pwd.Children)
+	Size int
+
+	Name string
+	Id   uuid.UUID
 }
 
 // NewFileTreeModel creates an empty FileTreeModel
@@ -40,136 +42,79 @@ func NewFileTreeModel() (tree *FileTreeModel) {
 	return tree
 }
 
-// renderParams is a representation of a FileNode in the context of the greater tree. Renderers
-// data stored is necessary for rendering a single line in a tree format.
-type renderParams struct {
-	node          *FileNode
-	spaces        []bool
-	childSpaces   []bool
-	showCollapsed bool
-	isLast        bool
-}
-
-// renderStringTreeBetween returns a string representing the given tree between the given rows. Since each node
-// is rendered on its own line, the returned string shows the visible nodes not affected by a collapsed parent.
-func (tree *FileTreeModel) renderStringTreeBetween(startRow, stopRow int, showAttributes bool) string {
-	// generate a list of nodes to render
-	var params = make([]renderParams, 0)
-	var result string
-
-	// visit from the front of the list
-	var paramsToVisit = []renderParams{{node: tree.Root, spaces: []bool{}, showCollapsed: false, isLast: false}}
-	for currentRow := 0; len(paramsToVisit) > 0 && currentRow <= stopRow; currentRow++ {
-		// pop the first node
-		var currentParams renderParams
-		currentParams, paramsToVisit = paramsToVisit[0], paramsToVisit[1:]
-
-		// take note of the next nodes to visit later
-		var keys []string
-		for key := range currentParams.node.Children {
-			keys = append(keys, key)
+func (tree *FileTreeModel) SetPwd(fqfp string) error {
+	if fqfp == "/" {
+		tree.pwd = tree.Root
+		tree.pwd.fqfp = fqfp
+	} else {
+		fileNode, err := tree.GetNode(fqfp)
+		if err != nil {
+			return err
 		}
-		// we should always visit nodes in order
-		sort.Strings(keys)
-
-		var childParams = make([]renderParams, 0)
-		for idx, name := range keys {
-			child := currentParams.node.Children[name]
-			// don't visit this node...
-			if child.Data.Hidden {
-				continue
-			}
-
-			// visit this node...
-			isLast := idx == (len(currentParams.node.Children) - 1)
-			showCollapsed := len(child.Children) > 0
-
-			// completely copy the reference slice
-			childSpaces := make([]bool, len(currentParams.childSpaces))
-			copy(childSpaces, currentParams.childSpaces)
-
-			if len(child.Children) > 0 {
-				childSpaces = append(childSpaces, isLast)
-			}
-
-			childParams = append(childParams, renderParams{
-				node:          child,
-				spaces:        currentParams.childSpaces,
-				childSpaces:   childSpaces,
-				showCollapsed: showCollapsed,
-				isLast:        isLast,
-			})
-		}
-		// keep the child nodes to visit later
-		paramsToVisit = append(childParams, paramsToVisit...)
-
-		// never process the root node
-		if currentParams.node == tree.Root {
-			currentRow--
-			continue
-		}
-
-		// process the current node
-		if currentRow >= startRow && currentRow <= stopRow {
-			params = append(params, currentParams)
-		}
+		tree.pwd = fileNode
 	}
-
-	// render the result
-	for idx := range params {
-		currentParams := params[idx]
-
-		if showAttributes {
-			result += currentParams.node.MetadataString() + " "
-		}
-		result += currentParams.node.renderTreeLine(currentParams.spaces, currentParams.isLast, currentParams.showCollapsed)
-	}
-
-	return result
+	return nil
 }
 
 func (tree *FileTreeModel) VisibleSize() int {
-	var size int
-
-	visitor := func(node *FileNode) error {
-		size++
-		return nil
+	if tree.pwd != tree.Root {
+		// +1 includes ".." parent reference
+		return len(tree.pwd.Children) + 1
+	} else {
+		return len(tree.Root.Children)
 	}
-	visitEvaluator := func(node *FileNode) bool {
-		if node.Data.FileInfo.IsDir() {
-			// we won't visit a directories, but we need to count it
-			size++
-			return !node.Data.Hidden
-		}
-		return !node.Data.Hidden
-	}
-	err := tree.VisitDepthParentFirst(visitor, visitEvaluator)
-	if err != nil {
-		log.Errorf("unable to determine visible tree size: %+v", err)
-	}
-
-	// don't include root
-	size--
-
-	return size
 }
 
 // String returns the entire tree in an ASCII representation.
 func (tree *FileTreeModel) String(showAttributes bool) string {
-	return tree.renderStringTreeBetween(0, tree.Size, showAttributes)
+	return tree.StringBetween(0, tree.VisibleSize(), showAttributes)
 }
 
 // StringBetween returns a partial tree in an ASCII representation.
 func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) string {
-	return tree.renderStringTreeBetween(start, stop, showAttributes)
+	stop = utils.MinOf(stop, tree.VisibleSize())
+
+	singleLine := func(node *FileNode) string {
+		var line string
+		if showAttributes {
+			line += node.MetadataString() + " "
+		}
+		line += node.String() + newLine
+		return line
+	}
+
+	var result string
+	if start == 0 {
+		// TODO: show parent as ".."
+		if tree.pwd != tree.Root {
+			result += singleLine(tree.pwd.Parent)
+			stop -= 1
+		}
+	}
+
+	var keys []string
+	for key := range tree.pwd.Children {
+		keys = append(keys, key)
+	}
+
+	// visit nodes in order
+	sort.Strings(keys)
+
+	for i := start; i < stop; i++ {
+		childKey := keys[i]
+		childNode := tree.pwd.Children[childKey]
+		result += singleLine(childNode)
+	}
+
+	return result
 }
 
 // Clone returns a copy of the given FileTreeModel
 func (tree *FileTreeModel) Clone() *FileTreeModel {
 	newTree := NewFileTreeModel()
 	newTree.Size = tree.Size
-	newTree.FileSize = tree.FileSize
 	newTree.Root = tree.Root.Copy(newTree.Root)
+	newTree.SetPwd(tree.pwd.fqfp)
 
 	// update the tree pointers
 	err := newTree.VisitDepthChildFirst(func(node *FileNode) error {
@@ -200,29 +145,30 @@ func (tree *FileTreeModel) VisitDepthParentFirst(visitor Visitor, evaluator Visi
 	return tree.Root.VisitDepthParentFirst(visitor, evaluator)
 }
 
-// GetNode fetches a single node when given a slash-delimited string from root ('/') to the desired node (e.g. '/a/node/absPath')
-func (tree *FileTreeModel) GetNode(path string) (*FileNode, error) {
-	nodeNames := strings.Split(strings.Trim(path, "/"), "/")
+// GetNode fetches a single node when given a fully qualified file path - slash-delimited string
+// from the root ('/') to the desired node (e.g. '/a/node/path.txt')
+func (tree *FileTreeModel) GetNode(fqfp string) (*FileNode, error) {
+	nodeNames := strings.Split(strings.Trim(fqfp, "/"), "/")
 	node := tree.Root
 	for _, name := range nodeNames {
 		if name == "" {
 			continue
 		}
 		if node.Children[name] == nil {
-			return nil, fmt.Errorf("absPath does not exist: %s", path)
+			return nil, fmt.Errorf("absolute path does not exist: %s", fqfp)
 		}
 		node = node.Children[name]
 	}
 	return node, nil
 }
 
-// AddPath adds a new node to the tree with the given payload
-func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, []*FileNode, error) {
-	filepath = path.Clean(filepath)
-	if filepath == "." {
-		return nil, nil, fmt.Errorf("cannot add relative absPath '%s'", filepath)
+// AddPath adds a new node to the tree when given fully qualified file path and optional payload
+func (tree *FileTreeModel) AddPath(fqfp string, info FileInfo) (*FileNode, []*FileNode, error) {
+	fqfp = path.Clean(fqfp)
+	if fqfp == "." {
+		return nil, nil, fmt.Errorf("cannot add relative path '%s'", fqfp)
 	}
-	nodeNames := strings.Split(strings.Trim(filepath, "/"), "/")
+	nodeNames := strings.Split(strings.Trim(fqfp, "/"), "/")
 	node := tree.Root
 	addedNodes := make([]*FileNode, 0)
 	for idx, name := range nodeNames {
@@ -240,7 +186,7 @@ func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, [
 
 			if node == nil {
 				// the child could not be added
-				return node, addedNodes, fmt.Errorf(fmt.Sprintf("could not add child node: '%s' (absPath:'%s')", name, filepath))
+				return node, addedNodes, fmt.Errorf(fmt.Sprintf("could not add child node: '%s' (path: '%s')", name, fqfp))
 			}
 		}
 
@@ -253,9 +199,10 @@ func (tree *FileTreeModel) AddPath(filepath string, info FileInfo) (*FileNode, [
 	return node, addedNodes, nil
 }
 
-// RemovePath removes a node from the tree given its absPath.
-func (tree *FileTreeModel) RemovePath(path string) error {
-	node, err := tree.GetNode(path)
+// RemovePath removes a node from the tree given its fully qualified file path - slash-delimited string
+// from the root ('/') to the desired node (e.g. '/a/node/path.txt').
+func (tree *FileTreeModel) RemovePath(fqfp string) error {
+	node, err := tree.GetNode(fqfp)
 	if err != nil {
 		return err
 	}
@@ -328,9 +275,9 @@ func (tree *FileTreeModel) CompareAndMark(upper *FileTreeModel) ([]PathError, er
 	return failed, nil
 }
 
-// markRemoved annotates the FileNode at the given absPath as Removed.
-func (tree *FileTreeModel) markRemoved(path string) error {
-	node, err := tree.GetNode(path)
+// markRemoved annotates the FileNode at the given fully qualified file path as Removed.
+func (tree *FileTreeModel) markRemoved(fqfp string) error {
+	node, err := tree.GetNode(fqfp)
 	if err != nil {
 		return err
 	}

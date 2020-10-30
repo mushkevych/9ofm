@@ -8,7 +8,7 @@ func TestAssignDiffType(t *testing.T) {
 	tree := NewFileTreeModel()
 	node, _, err := tree.AddPath("/usr", *BlankFileChangeInfo("/usr"))
 	if err != nil {
-		t.Errorf("Expected no error from fetching absPath. got: %v", err)
+		t.Errorf("Expected no error from fetching fqfp. got: %v", err)
 	}
 	node.Data.DiffType = Modified
 	if tree.Root.Children["usr"].Data.DiffType != Modified {
@@ -31,9 +31,9 @@ func TestMergeDiffTypes(t *testing.T) {
 	}
 }
 
-func BlankFileChangeInfo(path string) (f *FileInfo) {
+func BlankFileChangeInfo(fqfp string) (f *FileInfo) {
 	result := FileInfo{
-		Path: path,
+		Fqfp: fqfp,
 		Mode: 0, // regular file
 		hash: 123,
 	}

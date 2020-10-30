@@ -124,7 +124,7 @@ func TestFileTreeGoCase(t *testing.T) {
 
 	width, height := 100, 1000
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	runTestCase(t, vm, width, height, nil)
 }
@@ -134,7 +134,7 @@ func TestFileTreeNoAttributes(t *testing.T) {
 
 	width, height := 100, 1000
 	vm.Setup(0, height)
-	vm.ShowAttributes = false
+	vm.ShowFileAttributes = false
 
 	runTestCase(t, vm, width, height, nil)
 }
@@ -144,7 +144,7 @@ func TestFileTreeRestrictedHeight(t *testing.T) {
 
 	width, height := 100, 20
 	vm.Setup(0, height)
-	vm.ShowAttributes = false
+	vm.ShowFileAttributes = false
 
 	runTestCase(t, vm, width, height, nil)
 }
@@ -154,7 +154,7 @@ func TestFileTreeDirCollapse(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -182,7 +182,7 @@ func TestFileTreeSelectLayer(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -195,7 +195,7 @@ func TestFileShowAggregateChanges(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -208,7 +208,7 @@ func TestFileTreePageDown(t *testing.T) {
 
 	width, height := 100, 10
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 	err := vm.Update(nil, width, height)
 	checkError(t, err, "unable to update")
 
@@ -229,7 +229,7 @@ func TestFileTreePageUp(t *testing.T) {
 
 	width, height := 100, 10
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// these operations have a render step for intermediate results, which require at least one update to be done first
 	err := vm.Update(nil, width, height)
@@ -252,7 +252,7 @@ func TestFileTreeDirCursorRight(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -284,7 +284,7 @@ func TestFileTreeFilterTree(t *testing.T) {
 
 	width, height := 100, 1000
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	regex, err := regexp.Compile("network")
 	if err != nil {
@@ -299,7 +299,7 @@ func TestFileTreeHideAddedRemovedModified(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -322,7 +322,7 @@ func TestFileTreeHideUnmodified(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)
@@ -339,7 +339,7 @@ func TestFileTreeHideTypeWithFilter(t *testing.T) {
 
 	width, height := 100, 100
 	vm.Setup(0, height)
-	vm.ShowAttributes = true
+	vm.ShowFileAttributes = true
 
 	// collapse /bin
 	err := vm.ToggleCollapse(nil)

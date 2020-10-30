@@ -9,7 +9,7 @@ func TestAddChild(t *testing.T) {
 	tree := NewFileTreeModel()
 
 	payload := FileInfo{
-		Path: "stufffffs",
+		Fqfp: "stufffffs",
 	}
 
 	one := tree.Root.AddChild("first node!", payload)
@@ -37,10 +37,10 @@ func TestAddChild(t *testing.T) {
 	}
 
 	expectedFC := FileInfo{
-		Path: "stufffffs",
+		Fqfp: "stufffffs",
 	}
 	actualFC := one.Data.FileInfo
-	if expectedFC.Path != actualFC.Path {
+	if expectedFC.Fqfp != actualFC.Fqfp {
 		t.Errorf("Expected 'ones' payload to be %+v got %+v.", expectedFC, actualFC)
 	}
 
@@ -89,7 +89,7 @@ func TestPath(t *testing.T) {
 
 	actual := node.AbsPath()
 	if expected != actual {
-		t.Errorf("Expected absPath '%s' got '%s'", expected, actual)
+		t.Errorf("Expected fqfp '%s' got '%s'", expected, actual)
 	}
 }
 

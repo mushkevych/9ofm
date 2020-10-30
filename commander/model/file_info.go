@@ -11,7 +11,8 @@ import (
 
 // FileInfo contains tar metadata for a specific FileNode
 type FileInfo struct {
-	Path     string
+	// fully qualified file path: slash-delimited string from the root ('/') to the desired node (e.g. '/a/node/fqfp')
+	Fqfp     string
 	Linkname string
 	hash     uint64
 	Size     int64
@@ -22,23 +23,23 @@ type FileInfo struct {
 }
 
 // NewFileInfo extracts the metadata from the info and file contents and generates a new FileInfo object.
-func NewFileInfo(filePath string, info os.FileInfo, err error) FileInfo {
+func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
 	var hash uint64
 	if !info.IsDir() {
-		// hash = computeFileHash(filePath)
+		// hash = computeFileHash(fqfp)
 		hash = 0
 	}
 
 	var UID int = -1
 	var GID int = -1
-	// fileStats, _ := os.Stat(filePath)
+	// fileStats, _ := os.Stat(fqfp)
 	// if stat, ok := fileStats.Sys().(*syscall.Stat_t); ok {
 	// 	UID = int(stat.Uid)
 	// 	GID = int(stat.Gid)
 	// }
 
 	return FileInfo{
-		Path:     filePath,
+		Fqfp:     fqfp,
 		Linkname: info.Name(),
 		hash:     hash,
 		Size:     info.Size(),
@@ -50,7 +51,7 @@ func NewFileInfo(filePath string, info os.FileInfo, err error) FileInfo {
 }
 
 func (info *FileInfo) String() string {
-	return fmt.Sprintf("%v %v isDir=%v", info.Path, info.Size, info.IsDir())
+	return fmt.Sprintf("%v %v isDir=%v", info.Fqfp, info.Size, info.IsDir())
 }
 
 func (info *FileInfo) IsDir() bool {
@@ -63,7 +64,7 @@ func (info *FileInfo) Clone() *FileInfo {
 		return nil
 	}
 	return &FileInfo{
-		Path:     info.Path,
+		Fqfp:     info.Fqfp,
 		Linkname: info.Linkname,
 		hash:     info.hash,
 		Size:     info.Size,
@@ -87,9 +88,9 @@ func (info *FileInfo) Compare(other FileInfo) DiffType {
 	return Modified
 }
 
-func computeFileHash(filePath string) uint64 {
+func computeFileHash(fqfp string) uint64 {
 	//Open the passed argument and check for any error
-	file, err := os.Open(filePath)
+	file, err := os.Open(fqfp)
 	if err != nil {
 		return 0
 	}

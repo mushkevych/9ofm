@@ -26,5 +26,10 @@ func ReadFileTree(fqfp string) (*FileTreeModel, error) {
 		return nil
 	})
 
+	// Add parent directory reference ".."
+	if err := fileTree.SetPwd(fqfp); err != nil {
+		return nil, err
+	}
+
 	return fileTree, err
 }
