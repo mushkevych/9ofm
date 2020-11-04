@@ -35,8 +35,9 @@ type FileNode struct {
 
 // NewFileNode creates a new FileNode relative to the given parent node with a payload.
 func NewFileNode(parent *FileNode, fqfp string, name string, data FileInfo) (node *FileNode) {
-	if fqfp == "" && (name == "." || name == "..") {
-		log.Fatal("Absolute path must be provided for . and .. files")
+	if fqfp == "" && name == ".." {
+		log.Errorf("absolute path must be provided for .. reference")
+		return nil
 	}
 
 	node = new(FileNode)
@@ -54,14 +55,12 @@ func NewFileNode(parent *FileNode, fqfp string, name string, data FileInfo) (nod
 	if node.fqfp == "" {
 		node.fqfp = node.buildAbsPath()
 	}
-
 	return node
 }
 
 // Copy duplicates the existing node relative to a new parent node.
 func (node *FileNode) Copy(parent *FileNode) *FileNode {
 	newNode := NewFileNode(parent, "", node.Name, node.Data.FileInfo)
-	newNode.Data.Hidden = node.Data.Hidden
 	newNode.Data.DiffType = node.Data.DiffType
 	for name, child := range node.Children {
 		newNode.Children[name] = child.Copy(newNode)

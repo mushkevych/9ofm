@@ -92,27 +92,27 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 		},
 		{
 			KeyboardShortcut: "Ctrl+a",
-			OnAction:   func() error { return c.toggleShowDiffType(model.Added) },
-			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Added] },
-			Display:    "Added",
+			OnAction:         func() error { return c.toggleShowDiffType(model.Added) },
+			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Added] },
+			Display:          "Added",
 		},
 		{
 			KeyboardShortcut: "Ctrl+r",
-			OnAction:   func() error { return c.toggleShowDiffType(model.Removed) },
-			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Removed] },
-			Display:    "Removed",
+			OnAction:         func() error { return c.toggleShowDiffType(model.Removed) },
+			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Removed] },
+			Display:          "Removed",
 		},
 		{
 			KeyboardShortcut: "Ctrl+m",
-			OnAction:   func() error { return c.toggleShowDiffType(model.Modified) },
-			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Modified] },
-			Display:    "Modified",
+			OnAction:         func() error { return c.toggleShowDiffType(model.Modified) },
+			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Modified] },
+			Display:          "Modified",
 		},
 		{
 			KeyboardShortcut: "Ctrl+u",
-			OnAction:   func() error { return c.toggleShowDiffType(model.Unmodified) },
-			IsSelected: func() bool { return !c.ftv.HiddenDiffTypes[model.Unmodified] },
-			Display:    "Unmodified",
+			OnAction:         func() error { return c.toggleShowDiffType(model.Unmodified) },
+			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Unmodified] },
+			Display:          "Unmodified",
 		},
 		{
 			KeyboardShortcut: "Ctrl+b",
@@ -135,14 +135,6 @@ func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
 		{
 			KeyboardShortcut: "Up",
 			OnAction:         c.CursorUp,
-		},
-		{
-			KeyboardShortcut: "Left",
-			OnAction:         c.CursorLeft,
-		},
-		{
-			KeyboardShortcut: "Right",
-			OnAction:         c.CursorRight,
 		},
 	}
 
@@ -188,26 +180,6 @@ func (c *FileTreeController) CursorUp() error {
 	return nil
 }
 
-// CursorLeft moves the cursor up until we reach the Parent Node or top of the tree
-func (c *FileTreeController) CursorLeft() error {
-	err := c.ftv.CursorLeft(c.filterRegex)
-	if err != nil {
-		return err
-	}
-	_ = c.Update()
-	return c.Render()
-}
-
-// CursorRight descends into directory expanding it if needed
-func (c *FileTreeController) CursorRight() error {
-	err := c.ftv.CursorRight(c.filterRegex)
-	if err != nil {
-		return err
-	}
-	_ = c.Update()
-	return c.Render()
-}
-
 // PageDown moves to next page putting the cursor on top
 func (c *FileTreeController) PageDown() error {
 	err := c.ftv.PageDown()
@@ -226,15 +198,10 @@ func (c *FileTreeController) PageUp() error {
 	return c.Render()
 }
 
-// getAbsPositionNode determines the selected screen cursor's location in the file tree, returning the selected FileNode.
-func (c *FileTreeController) getAbsPositionNode() (node *model.FileNode) {
-	return c.ftv.GetAbsPositionNode(c.filterRegex)
-}
-
 // navigateTo will enter the directory
 func (c *FileTreeController) navigateTo() error {
-	fileNode := c.ftv.GetAbsPositionNode(c.filterRegex)
-	if fileNode.IsDir() {
+	fileNode := c.ftv.GetNodeAtCursor()
+	if fileNode.IsDir() || fileNode.AbsPath() == "/" {
 		fqfp := fileNode.AbsPath()
 		fileTree, err := model.ReadFileTree(fqfp)
 		if err != nil {
@@ -247,16 +214,6 @@ func (c *FileTreeController) navigateTo() error {
 		}
 	}
 
-	_ = c.Update()
-	return c.Render()
-}
-
-// toggleCollapse will collapse/expand the selected FileNode.
-func (c *FileTreeController) toggleCollapse() error {
-	err := c.ftv.ToggleCollapse(c.filterRegex)
-	if err != nil {
-		return err
-	}
 	_ = c.Update()
 	return c.Render()
 }

@@ -22,20 +22,28 @@ type FileTreeView struct {
 
 	// Clone of the ModelTree to accommodate actions such as "hide", "compare", etc
 	// ViewTree is used for Rendering
-	ViewTree  *model.FileTreeModel
+	ViewTree *model.FileTreeModel
 
 	constrainedRealEstate bool
 
-	ShowFileAttributes          bool
+	// if True - the file attributes, such as permissions, owner, etc are shown
+	ShowFileAttributes bool
+
+	// TODO: remove
 	unconstrainedShowAttributes bool
-	HiddenDiffTypes             []bool
-	TreeIndex                   int
-	bufferIndex                 int
-	bufferIndexLowerBound       int
+
+	HiddenDiffTypes []bool
+
+	// index of the cursor (selected file in the UI) in the File Panel
+	CursorIndex int
+
+	bufferIndex           int
+	bufferIndexLowerBound int
 
 	refHeight int
 	refWidth  int
 
+	// Buffer is composed during Render() method and flushed to UI via Controller.Render()
 	Buffer bytes.Buffer
 }
 
@@ -65,18 +73,18 @@ func (v *FileTreeView) IsVisible() bool {
 
 // ResetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
 func (v *FileTreeView) ResetCursor() {
-	v.TreeIndex = 0
+	v.CursorIndex = 0
 	v.bufferIndex = 0
 	v.bufferIndexLowerBound = 0
 }
 
 // CursorUp performs the internal view's buffer adjustments on cursor up. Note: this is independent of the gocui buffer.
 func (v *FileTreeView) CursorUp() bool {
-	if v.TreeIndex <= 0 {
+	if v.CursorIndex <= 0 {
 		return false
 	}
-	v.TreeIndex--
-	if v.TreeIndex < v.bufferIndexLowerBound {
+	v.CursorIndex--
+	if v.CursorIndex < v.bufferIndexLowerBound {
 		v.bufferIndexLowerBound--
 	}
 	if v.bufferIndex > 0 {
@@ -87,11 +95,11 @@ func (v *FileTreeView) CursorUp() bool {
 
 // CursorDown performs the internal view's buffer adjustments on cursor down. Note: this is independent of the gocui buffer.
 func (v *FileTreeView) CursorDown() bool {
-	if v.TreeIndex >= v.ModelTree.VisibleSize() {
+	if v.CursorIndex >= v.ModelTree.VisibleSize() {
 		return false
 	}
-	v.TreeIndex++
-	if v.TreeIndex > v.bufferIndexUpperBound() {
+	v.CursorIndex++
+	if v.CursorIndex > v.bufferIndexUpperBound() {
 		v.bufferIndexLowerBound++
 	}
 	v.bufferIndex++
@@ -99,85 +107,6 @@ func (v *FileTreeView) CursorDown() bool {
 		v.bufferIndex = v.height()
 	}
 	return true
-}
-
-// CursorLeft moves the cursor up until we reach the Parent Node or top of the tree
-func (v *FileTreeView) CursorLeft(filterRegex *regexp.Regexp) error {
-	var visitor func(*model.FileNode) error
-	var evaluator func(*model.FileNode) bool
-	var dfsCounter, newIndex int
-	oldIndex := v.TreeIndex
-	currentNode := v.GetAbsPositionNode(filterRegex)
-
-	if currentNode == nil {
-		return nil
-	}
-	parentPath := currentNode.Parent.AbsPath()
-
-	visitor = func(curNode *model.FileNode) error {
-		if strings.Compare(parentPath, curNode.AbsPath()) == 0 {
-			newIndex = dfsCounter
-		}
-		dfsCounter++
-		return nil
-	}
-
-	evaluator = func(curNode *model.FileNode) bool {
-		regexMatch := true
-		if filterRegex != nil {
-			match := filterRegex.Find([]byte(curNode.AbsPath()))
-			regexMatch = match != nil
-		}
-		return !curNode.Data.Hidden && regexMatch
-	}
-
-	err := v.ModelTree.VisitDepthParentFirst(visitor, evaluator)
-	if err != nil {
-		log.Errorf("could not propagate tree on cursorLeft: %+v", err)
-		return err
-	}
-
-	v.TreeIndex = newIndex
-	moveIndex := oldIndex - newIndex
-	if newIndex < v.bufferIndexLowerBound {
-		v.bufferIndexLowerBound = v.TreeIndex
-	}
-
-	if v.bufferIndex > moveIndex {
-		v.bufferIndex -= moveIndex
-	} else {
-		v.bufferIndex = 0
-	}
-
-	return nil
-}
-
-// CursorRight descends into directory expanding it if needed
-func (v *FileTreeView) CursorRight(filterRegex *regexp.Regexp) error {
-	node := v.GetAbsPositionNode(filterRegex)
-	if node == nil {
-		return nil
-	}
-
-	if !node.Data.FileInfo.IsDir() {
-		return nil
-	}
-
-	if len(node.Children) == 0 {
-		return nil
-	}
-
-	v.TreeIndex++
-	if v.TreeIndex > v.bufferIndexUpperBound() {
-		v.bufferIndexLowerBound++
-	}
-
-	v.bufferIndex++
-	if v.bufferIndex > v.height() {
-		v.bufferIndex = v.height()
-	}
-
-	return nil
 }
 
 // PageDown moves to next page putting the cursor on top
@@ -196,9 +125,9 @@ func (v *FileTreeView) PageDown() error {
 
 	v.bufferIndexLowerBound = nextBufferIndexLowerBound
 
-	if v.TreeIndex < nextBufferIndexLowerBound {
+	if v.CursorIndex < nextBufferIndexLowerBound {
 		v.bufferIndex = 0
-		v.TreeIndex = nextBufferIndexLowerBound
+		v.CursorIndex = nextBufferIndexLowerBound
 	} else {
 		v.bufferIndex -= newLines
 	}
@@ -222,57 +151,19 @@ func (v *FileTreeView) PageUp() error {
 
 	v.bufferIndexLowerBound = nextBufferIndexLowerBound
 
-	if v.TreeIndex > (nextBufferIndexUpperBound - 1) {
+	if v.CursorIndex > (nextBufferIndexUpperBound - 1) {
 		v.bufferIndex = 0
-		v.TreeIndex = nextBufferIndexLowerBound
+		v.CursorIndex = nextBufferIndexLowerBound
 	} else {
 		v.bufferIndex += newLines
 	}
 	return nil
 }
 
-// GetAbsPositionNode determines the selected screen cursor's location in the file tree,
+// GetNodeAtCursor determines the selected screen cursor's location in the file tree,
 // returning the selected FileNode.
-func (v *FileTreeView) GetAbsPositionNode(filterRegex *regexp.Regexp) (node *model.FileNode) {
-	var visitor func(*model.FileNode) error
-	var evaluator func(*model.FileNode) bool
-	var dfsCounter int
-
-	visitor = func(curNode *model.FileNode) error {
-		if dfsCounter == v.TreeIndex {
-			node = curNode
-		}
-		dfsCounter++
-		return nil
-	}
-
-	evaluator = func(curNode *model.FileNode) bool {
-		if curNode.Parent == nil{
-			return true
-		}
-		regexMatch := true
-		if filterRegex != nil {
-			match := filterRegex.Find([]byte(curNode.AbsPath()))
-			regexMatch = match != nil
-		}
-		return !curNode.Data.Hidden && regexMatch
-	}
-
-	err := v.ModelTree.VisitDepthParentFirst(visitor, evaluator)
-	if err != nil {
-		log.Errorf("unable to get node position: %+v", err)
-	}
-
-	return node
-}
-
-// ToggleCollapse will collapse/expand the selected FileNode.
-func (v *FileTreeView) ToggleCollapse(filterRegex *regexp.Regexp) error {
-	node := v.GetAbsPositionNode(filterRegex)
-	if node != nil && node.Data.FileInfo.IsDir() {
-		//node.Data.ViewInfo.Collapsed = !node.Data.ViewInfo.Collapsed
-	}
-	return nil
+func (v *FileTreeView) GetNodeAtCursor() (node *model.FileNode) {
+	return v.ModelTree.GetNodeAt(v.CursorIndex)
 }
 
 func (v *FileTreeView) ConstrainLayout() {
@@ -314,18 +205,10 @@ func (v *FileTreeView) Update(filterRegex *regexp.Regexp, width, height int) err
 
 	// keep the v selection in parity with the current DiffType selection
 	err := v.ModelTree.VisitDepthChildFirst(func(node *model.FileNode) error {
-		node.Data.Hidden = v.HiddenDiffTypes[node.Data.DiffType]
-		visibleChild := false
-		for _, child := range node.Children {
-			if !child.Data.Hidden {
-				visibleChild = true
-				node.Data.Hidden = false
-			}
-		}
-		// hide nodes that do not match the current file filter regex (also don't unhide nodes that are already hidden)
-		if filterRegex != nil && !visibleChild && !node.Data.Hidden {
+		// select first node that matches the current file filter regex
+		if filterRegex != nil {
 			match := filterRegex.FindString(node.AbsPath())
-			node.Data.Hidden = len(match) == 0
+			_ = len(match) == 0
 		}
 		return nil
 	}, nil)
@@ -338,12 +221,12 @@ func (v *FileTreeView) Update(filterRegex *regexp.Regexp, width, height int) err
 	// make a new tree with only visible nodes
 	v.ViewTree = v.ModelTree.Clone()
 	err = v.ViewTree.VisitDepthParentFirst(func(node *model.FileNode) error {
-		if node.Data.Hidden {
-			err1 := v.ViewTree.RemovePath(node.AbsPath())
-			if err1 != nil {
-				return err1
-			}
-		}
+		//if node.Data.Hidden {
+		//	err1 := v.ViewTree.RemovePath(node.AbsPath())
+		//	if err1 != nil {
+		//		return err1
+		//	}
+		//}
 		return nil
 	}, nil)
 

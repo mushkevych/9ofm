@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"github.com/mushkevych/9ofm/utils"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	newLine         = "\n"
+	newLine = "\n"
 )
 
 // FileTreeModel represents a set of files, directories, and their relations.
@@ -56,6 +57,35 @@ func (tree *FileTreeModel) SetPwd(fqfp string) error {
 	return nil
 }
 
+func (tree *FileTreeModel) getSortedChildrenKeys() []string {
+	var keys []string
+	for key := range tree.pwd.Children {
+		keys = append(keys, key)
+	}
+
+	// in-place sorting
+	sort.Strings(keys)
+	return keys
+}
+
+// GetNodeAt returns FileNode representing n-th element in the FileTree by the 0-based index
+func (tree *FileTreeModel) GetNodeAt(index int) *FileNode {
+	keys := tree.getSortedChildrenKeys()
+
+	if tree.pwd != tree.Root {
+		if index == 0 {
+			// 1st node is "..", which refers to the tree.pwd
+			return tree.pwd.Parent
+		} else {
+			childKey := keys[index-1]
+			return tree.pwd.Children[childKey]
+		}
+	} else {
+		childKey := keys[index]
+		return tree.Root.Children[childKey]
+	}
+}
+
 func (tree *FileTreeModel) VisibleSize() int {
 	if tree.pwd != tree.Root {
 		// +1 includes ".." parent reference
@@ -72,6 +102,7 @@ func (tree *FileTreeModel) String(showAttributes bool) string {
 
 // StringBetween returns a partial tree in an ASCII representation.
 func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) string {
+	// account for use case when list of available files is less than available visual area
 	stop = utils.MinOf(stop, tree.VisibleSize())
 
 	singleLine := func(node *FileNode) string {
@@ -85,21 +116,17 @@ func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) s
 
 	var result string
 	if start == 0 {
-		// TODO: show parent as ".."
 		if tree.pwd != tree.Root {
-			result += singleLine(tree.pwd.Parent)
+			if showAttributes {
+				result += tree.pwd.Parent.MetadataString() + " "
+			}
+			result += ".." + newLine
+
 			stop -= 1
 		}
 	}
 
-	var keys []string
-	for key := range tree.pwd.Children {
-		keys = append(keys, key)
-	}
-
-	// visit nodes in order
-	sort.Strings(keys)
-
+	keys := tree.getSortedChildrenKeys()
 	for i := start; i < stop; i++ {
 		childKey := keys[i]
 		childNode := tree.pwd.Children[childKey]
@@ -168,33 +195,37 @@ func (tree *FileTreeModel) AddPath(fqfp string, info FileInfo) (*FileNode, []*Fi
 	if fqfp == "." {
 		return nil, nil, fmt.Errorf("cannot add relative path '%s'", fqfp)
 	}
-	nodeNames := strings.Split(strings.Trim(fqfp, "/"), "/")
 	node := tree.Root
 	addedNodes := make([]*FileNode, 0)
+
+	currentFqfp := ""
+	nodeNames := strings.Split(strings.Trim(fqfp, "/"), "/")
 	for idx, name := range nodeNames {
 		if name == "" {
 			continue
 		}
-		// find or create node
+
+		currentFqfp += string(os.PathSeparator) + name
 		if node.Children[name] != nil {
 			node = node.Children[name]
 		} else {
-			// don't attach the payload. The payload is destined for the
-			// AbsPath's end node, not any intermediary node.
-			node = node.AddChild(name, FileInfo{})
-			addedNodes = append(addedNodes, node)
+			if idx == len(nodeNames)-1 {
+				// this is the actual child that was intended to be added
+				node = node.AddChild(name, info)
+ 			} else {
+ 				// this is an intermediary node in the absolute path
+ 				// for instance: /a/b/intermediary/the_child
+				osFileInfo, err := os.Stat(currentFqfp)
+				fileInfo := NewFileInfo(currentFqfp, osFileInfo, err)
+				node = node.AddChild(name, fileInfo)
+			}
 
+			addedNodes = append(addedNodes, node)
 			if node == nil {
 				// the child could not be added
 				return node, addedNodes, fmt.Errorf(fmt.Sprintf("could not add child node: '%s' (path: '%s')", name, fqfp))
 			}
 		}
-
-		// attach payload to the last specified node
-		if idx == len(nodeNames)-1 {
-			node.Data.FileInfo = info
-		}
-
 	}
 	return node, addedNodes, nil
 }

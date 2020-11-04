@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 
 	"github.com/cespare/xxhash"
 	log "github.com/sirupsen/logrus"
@@ -30,13 +31,16 @@ func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
 		hash = 0
 	}
 
-	var UID int = -1
-	var GID int = -1
-	// fileStats, _ := os.Stat(fqfp)
-	// if stat, ok := fileStats.Sys().(*syscall.Stat_t); ok {
-	// 	UID = int(stat.Uid)
-	// 	GID = int(stat.Gid)
-	// }
+	UID := -1
+	GID := -1
+	fileStats, err := os.Stat(fqfp)
+	if err != nil {
+		log.Panicf(fmt.Sprintf("could not retrieve os.Stats: '%s' (path: '%s')", err, fqfp))
+	}
+	if stat, ok := fileStats.Sys().(*syscall.Stat_t); ok {
+		UID = int(stat.Uid)
+		GID = int(stat.Gid)
+	}
 
 	return FileInfo{
 		Fqfp:     fqfp,
