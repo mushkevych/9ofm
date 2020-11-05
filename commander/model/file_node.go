@@ -34,7 +34,7 @@ type FileNode struct {
 }
 
 // NewFileNode creates a new FileNode relative to the given parent node with a payload.
-func NewFileNode(parent *FileNode, fqfp string, name string, data FileInfo) (node *FileNode) {
+func NewFileNode(parent *FileNode, fqfp string, name string, info FileInfo) (node *FileNode) {
 	if fqfp == "" && name == ".." {
 		log.Errorf("absolute path must be provided for .. reference")
 		return nil
@@ -43,7 +43,7 @@ func NewFileNode(parent *FileNode, fqfp string, name string, data FileInfo) (nod
 	node = new(FileNode)
 	node.Name = name
 	node.Data = *NewNodeData()
-	node.Data.FileInfo = *data.Clone()
+	node.Data.FileInfo = *info.Clone()
 
 	node.Children = make(map[string]*FileNode)
 	node.Parent = parent
@@ -70,17 +70,16 @@ func (node *FileNode) Copy(parent *FileNode) *FileNode {
 }
 
 // AddChild creates a new node relative to the current FileNode.
-func (node *FileNode) AddChild(name string, data FileInfo) (child *FileNode) {
-	child = NewFileNode(node, "", name, data)
+func (node *FileNode) AddChild(name string, info FileInfo) *FileNode {
 	if node.Children[name] != nil {
 		// tree node already exists, replace the payload, keep the children
-		node.Children[name].Data.FileInfo = *data.Clone()
+		node.Children[name].Data.FileInfo = *info.Clone()
 	} else {
-		node.Children[name] = child
+		node.Children[name] = NewFileNode(node, info.Fqfp, name, info)
 		node.Tree.Size++
 	}
 
-	return child
+	return node.Children[name]
 }
 
 // Remove deletes the current FileNode from it's parent FileNode's relations.

@@ -17,20 +17,13 @@ import (
 // FileTreeViewModel holds the UI objects and data models for populating the right pane. Specifically the pane that
 // shows selected layer or aggregate file ASCII tree.
 type FileTreeView struct {
-	// Tree model that holds Truth and is not modified for Rendering
+	// Tree model that holds representation of the filesystem for given path
 	ModelTree *model.FileTreeModel
-
-	// Clone of the ModelTree to accommodate actions such as "hide", "compare", etc
-	// ViewTree is used for Rendering
-	ViewTree *model.FileTreeModel
 
 	constrainedRealEstate bool
 
 	// if True - the file attributes, such as permissions, owner, etc are shown
 	ShowFileAttributes bool
-
-	// TODO: remove
-	unconstrainedShowAttributes bool
 
 	HiddenDiffTypes []bool
 
@@ -114,8 +107,7 @@ func (v *FileTreeView) PageDown() error {
 	nextBufferIndexLowerBound := v.bufferIndexLowerBound + v.height()
 	nextBufferIndexUpperBound := nextBufferIndexLowerBound + v.height()
 
-	// todo: this work should be saved or passed to render...
-	treeString := v.ViewTree.StringBetween(nextBufferIndexLowerBound, nextBufferIndexUpperBound, v.ShowFileAttributes)
+	treeString := v.ModelTree.StringBetween(nextBufferIndexLowerBound, nextBufferIndexUpperBound, v.ShowFileAttributes)
 	lines := strings.Split(treeString, "\n")
 
 	newLines := len(lines) - 1
@@ -140,8 +132,7 @@ func (v *FileTreeView) PageUp() error {
 	nextBufferIndexLowerBound := v.bufferIndexLowerBound - v.height()
 	nextBufferIndexUpperBound := nextBufferIndexLowerBound + v.height()
 
-	// todo: this work should be saved or passed to render...
-	treeString := v.ViewTree.StringBetween(nextBufferIndexLowerBound, nextBufferIndexUpperBound, v.ShowFileAttributes)
+	treeString := v.ModelTree.StringBetween(nextBufferIndexLowerBound, nextBufferIndexUpperBound, v.ShowFileAttributes)
 	lines := strings.Split(treeString, "\n")
 
 	newLines := len(lines) - 2
@@ -170,7 +161,6 @@ func (v *FileTreeView) ConstrainLayout() {
 	if !v.constrainedRealEstate {
 		log.Debugf("constraining model layout")
 		v.constrainedRealEstate = true
-		v.unconstrainedShowAttributes = v.ShowFileAttributes
 		v.ShowFileAttributes = false
 	}
 }
@@ -178,7 +168,7 @@ func (v *FileTreeView) ConstrainLayout() {
 func (v *FileTreeView) ExpandLayout() {
 	if v.constrainedRealEstate {
 		log.Debugf("expanding model layout")
-		v.ShowFileAttributes = v.unconstrainedShowAttributes
+		v.ShowFileAttributes = true
 		v.constrainedRealEstate = false
 	}
 }
@@ -218,34 +208,13 @@ func (v *FileTreeView) Update(filterRegex *regexp.Regexp, width, height int) err
 		return err
 	}
 
-	// make a new tree with only visible nodes
-	v.ViewTree = v.ModelTree.Clone()
-	err = v.ViewTree.VisitDepthParentFirst(func(node *model.FileNode) error {
-		//if node.Data.Hidden {
-		//	err1 := v.ViewTree.RemovePath(node.AbsPath())
-		//	if err1 != nil {
-		//		return err1
-		//	}
-		//}
-		return nil
-	}, nil)
-
-	if err != nil {
-		log.Errorf("unable to propagate v view tree: %+v", err)
-		return err
-	}
-
 	return nil
 }
 
 // Render flushes the state objects (file tree) to the pane.
 func (v *FileTreeView) Render() error {
-	treeString := v.ViewTree.StringBetween(v.bufferIndexLowerBound, v.bufferIndexUpperBound(), v.ShowFileAttributes)
+	treeString := v.ModelTree.StringBetween(v.bufferIndexLowerBound, v.bufferIndexUpperBound(), v.ShowFileAttributes)
 	lines := strings.Split(treeString, "\n")
-	// lines := [...]string{
-	// 	"[0mdrwxr-xr-x         0:0     1.2 MB [0m ├── [0mbin[0m",
-	// 	"[0mdrwxr-xr-x         0:0     1.3 MB [0m ├── [0mbin[0m",
-	// }
 
 	// update the contents
 	v.Buffer.Reset()
@@ -273,7 +242,6 @@ func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, er
 
 	// populate main fields
 	treeViewModel.ShowFileAttributes = configuration.Config.GetBool("filetree.show-attributes")
-	treeViewModel.unconstrainedShowAttributes = treeViewModel.ShowFileAttributes
 	treeViewModel.ModelTree = tree
 	treeViewModel.HiddenDiffTypes = make([]bool, 4)
 

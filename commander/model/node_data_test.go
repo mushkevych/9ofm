@@ -4,6 +4,15 @@ import (
 	"testing"
 )
 
+func BlankFileChangeInfo(fqfp string) (f *FileInfo) {
+	result := FileInfo{
+		Fqfp: fqfp,
+		Mode: 0, // regular file
+		hash: 123,
+	}
+	return &result
+}
+
 func TestAssignDiffType(t *testing.T) {
 	tree := NewFileTreeModel()
 	node, _, err := tree.AddPath("/usr", *BlankFileChangeInfo("/usr"))
@@ -29,13 +38,4 @@ func TestMergeDiffTypes(t *testing.T) {
 	if merged != Modified {
 		t.Errorf("Expected Unchaged (0) but got %v", merged)
 	}
-}
-
-func BlankFileChangeInfo(fqfp string) (f *FileInfo) {
-	result := FileInfo{
-		Fqfp: fqfp,
-		Mode: 0, // regular file
-		hash: 123,
-	}
-	return &result
 }

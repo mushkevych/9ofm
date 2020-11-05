@@ -8,40 +8,35 @@ func TestAddChild(t *testing.T) {
 	var expected, actual int
 	tree := NewFileTreeModel()
 
-	payload := FileInfo{
-		Fqfp: "stufffffs",
+	one := tree.Root.AddChild("one.txt", FileInfo{
+		Fqfp: "/one.txt",
+	})
+
+	two := tree.Root.AddChild("folder", FileInfo{})
+
+	tree.Root.AddChild("three.txt!", FileInfo{})
+	two.AddChild("sub-one", FileInfo{})
+	two.AddChild("sub-two", FileInfo{})
+	two.AddChild("sub-three", FileInfo{})
+
+	expected, actual = 6, tree.Size
+	if expected != actual {
+		t.Errorf("Expected a tree size of %d vs %d.", expected, actual)
 	}
 
-	one := tree.Root.AddChild("first node!", payload)
-
-	two := tree.Root.AddChild("nil node!", FileInfo{})
-
-	tree.Root.AddChild("third node!", FileInfo{})
-	two.AddChild("forth, one level down...", FileInfo{})
-	two.AddChild("fifth, one level down...", FileInfo{})
-	two.AddChild("fifth, one level down...", FileInfo{})
-
-	expected, actual = 5, tree.Size
+	expected, actual = 3, len(two.Children)
 	if expected != actual {
-		t.Errorf("Expected a tree size of %d got %d.", expected, actual)
-	}
-
-	expected, actual = 2, len(two.Children)
-	if expected != actual {
-		t.Errorf("Expected 'twos' number of children to be %d got %d.", expected, actual)
+		t.Errorf("Expected number of children %d vs %d.", expected, actual)
 	}
 
 	expected, actual = 3, len(tree.Root.Children)
 	if expected != actual {
-		t.Errorf("Expected 'twos' number of children to be %d got %d.", expected, actual)
+		t.Errorf("Expected Root's number of children to be %d got %d.", expected, actual)
 	}
 
-	expectedFC := FileInfo{
-		Fqfp: "stufffffs",
-	}
-	actualFC := one.Data.FileInfo
-	if expectedFC.Fqfp != actualFC.Fqfp {
-		t.Errorf("Expected 'ones' payload to be %+v got %+v.", expectedFC, actualFC)
+	expectedFqfp, actualFqfp := "/one.txt", one.Data.FileInfo.Fqfp
+	if expected != actual {
+		t.Errorf("Expected fully qualified filepath to be %+v got %+v.", expectedFqfp, actualFqfp)
 	}
 
 }
@@ -83,13 +78,26 @@ func TestRemoveChild(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
-	expected := "/etc/nginx/nginx.conf"
+	expectedFqfp := "/etc/systemd/system.conf"
 	tree := NewFileTreeModel()
-	node, _, _ := tree.AddPath(expected, FileInfo{})
+	node, _, _ := tree.AddPath(expectedFqfp, FileInfo{Fqfp: expectedFqfp})
 
-	actual := node.AbsPath()
+	actualFqfp := node.AbsPath()
+	if expectedFqfp != actualFqfp {
+		t.Errorf("Expected fqfp '%s' got '%s'", expectedFqfp, actualFqfp)
+	}
+
+	if tree.Root.Parent != nil {
+		t.Errorf("Expected Root's parent to be NIL")
+	}
+
+	if tree.Root.Name != tree.Root.AbsPath() || tree.Root.AbsPath() != "/" {
+		t.Errorf("Expected Root's Fqfp to be /, got '%s'", tree.Root.AbsPath())
+	}
+
+	expected, actual := 3, tree.Size
 	if expected != actual {
-		t.Errorf("Expected fqfp '%s' got '%s'", expected, actual)
+		t.Errorf("Expected a tree size of %d got %d.", expected, actual)
 	}
 }
 
@@ -115,34 +123,34 @@ func TestDiffTypeFromRemovedChildren(t *testing.T) {
 	tree := NewFileTreeModel()
 	_, _, _ = tree.AddPath("/usr", *BlankFileChangeInfo("/usr"))
 
-	info1 := BlankFileChangeInfo("/usr/.wh.bin")
-	node, _, _ := tree.AddPath("/usr/.wh.bin", *info1)
+	info1 := BlankFileChangeInfo("/usr/bin/awk")
+	node, _, _ := tree.AddPath("/usr/bin/awk", *info1)
 	node.Data.DiffType = Removed
 
-	info2 := BlankFileChangeInfo("/usr/.wh.bin2")
-	node, _, _ = tree.AddPath("/usr/.wh.bin2", *info2)
+	info2 := BlankFileChangeInfo("/usr/bin/gawk")
+	node, _, _ = tree.AddPath("/usr/bin/gawk", *info2)
 	node.Data.DiffType = Removed
 
-	err := tree.Root.Children["usr"].deriveDiffType(Unmodified)
+	err := tree.Root.Children["usr"].Children["bin"].deriveDiffType(Unmodified)
 	checkError(t, err, "unable to setup test")
 
-	if tree.Root.Children["usr"].Data.DiffType != Modified {
+	if tree.Root.Children["usr"].Children["bin"].Data.DiffType != Modified {
 		t.Errorf("Expected Modified but got %v", tree.Root.Children["usr"].Data.DiffType)
 	}
-
 }
 
 func TestDirSize(t *testing.T) {
 	tree1 := NewFileTreeModel()
-	_, _, err := tree1.AddPath("/etc/nginx/public1", FileInfo{Size: 100})
+
+	_, _, err := tree1.AddPath("/usr/bin/awk", FileInfo{Size: 100})
 	checkError(t, err, "unable to setup test")
-	_, _, err = tree1.AddPath("/etc/nginx/thing1", FileInfo{Size: 200})
+	_, _, err = tree1.AddPath("/usr/bin/gawk", FileInfo{Size: 200})
 	checkError(t, err, "unable to setup test")
-	_, _, err = tree1.AddPath("/etc/nginx/public3/thing2", FileInfo{Size: 300})
+	_, _, err = tree1.AddPath("/usr/bin/basename", FileInfo{Size: 300})
 	checkError(t, err, "unable to setup test")
 
-	node, _ := tree1.GetNode("/etc/nginx")
-	expected, actual := "----------         0:0      600 B ", node.MetadataString()
+	node, _ := tree1.GetNode("/usr/bin")
+	expected, actual := "drwxr-xr-x         0:0      87 kB ", node.MetadataString()
 	if expected != actual {
 		t.Errorf("Expected metadata '%s' got '%s'", expected, actual)
 	}

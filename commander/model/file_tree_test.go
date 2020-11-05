@@ -21,43 +21,39 @@ func AssertDiffType(node *FileNode, expectedDiffType DiffType) error {
 	return nil
 }
 
-func TestStringCollapsed(t *testing.T) {
+func TestTreePwdString(t *testing.T) {
 	tree := NewFileTreeModel()
-	tree.Root.AddChild("1 node!", FileInfo{})
-	two := tree.Root.AddChild("2 node!", FileInfo{})
-	subTwo := two.AddChild("2 child!", FileInfo{})
-	subTwo.AddChild("2 grandchild!", FileInfo{})
-	subTwo.Data.ViewInfo.Collapsed = true
-	three := tree.Root.AddChild("3 node!", FileInfo{})
-	subThree := three.AddChild("3 child!", FileInfo{})
-	three.AddChild("3 nested child 1!", FileInfo{})
-	threeGc1 := subThree.AddChild("3 grandchild 1!", FileInfo{})
-	threeGc1.AddChild("3 greatgrandchild 1!", FileInfo{})
-	subThree.AddChild("3 grandchild 2!", FileInfo{})
-	four := tree.Root.AddChild("4 node!", FileInfo{})
-	four.Data.ViewInfo.Collapsed = true
-	tree.Root.AddChild("5 node!", FileInfo{})
-	four.AddChild("6, one level down...", FileInfo{})
+	_ = tree.Root.AddChild("etc", FileInfo{})
+	usr := tree.Root.AddChild("usr", FileInfo{})
+	usrBin := usr.AddChild("bin", FileInfo{})
+	usrBin.AddChild("gawk", FileInfo{})
+	usrBin.AddChild("awk", FileInfo{})
 
-	expected :=
-		`├── 1 node!
-├── 2 node!
-│   └─⊕ 2 child!
-├── 3 node!
-│   ├── 3 child!
-│   │   ├── 3 grandchild 1!
-│   │   │   └── 3 greatgrandchild 1!
-│   │   └── 3 grandchild 2!
-│   └── 3 nested child 1!
-├─⊕ 4 node!
-└── 5 node!
-`
-	actual := tree.String(false)
+	varDir := tree.Root.AddChild("var", FileInfo{})
+	varLog := varDir.AddChild("log", FileInfo{})
+	_ = varDir.AddChild("lib", FileInfo{})
+	varLog.AddChild("syslog", FileInfo{})
+	varLog.AddChild("kern.log", FileInfo{})
 
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
+	// format: <pwd: expectedOutput>
+	fixtures := map[string]string{
+		"/": "etc\nusr\nvar\n",
+		"/etc": "..\n",
+		"/usr": "..\nbin\n",
+		"/usr/bin": "..\nawk\ngawk\n",
+		"/var/": "..\nlib\nlog\n",
+		"/var/log/": "..\nkern.log\nsyslog\n",
 	}
 
+	for pwd, expectedOutput := range fixtures {
+		tree.SetPwd(pwd)
+		actual := tree.String(false)
+
+		if expectedOutput != actual {
+			t.Errorf("Expected tree representation for %s:\n--->%s<---\nGot:\n--->%s<---",
+				pwd, expectedOutput, actual)
+		}
+	}
 }
 
 func TestString(t *testing.T) {
@@ -812,17 +808,17 @@ func TestRemoveOnIterate(t *testing.T) {
 		}
 		node, _, err := tree.AddPath(value, fakeData)
 		if err == nil && stringInSlice(node.AbsPath(), []string{"/etc"}) {
-			node.Data.ViewInfo.Hidden = true
+			//node.Data.ViewInfo.Hidden = true
 		}
 	}
 
 	err := tree.VisitDepthChildFirst(func(node *FileNode) error {
-		if node.Data.ViewInfo.Hidden {
-			err := tree.RemovePath(node.AbsPath())
-			if err != nil {
-				t.Errorf("could not setup test: %v", err)
-			}
-		}
+		//if node.Data.ViewInfo.Hidden {
+		//	err := tree.RemovePath(node.AbsPath())
+		//	if err != nil {
+		//		t.Errorf("could not setup test: %v", err)
+		//	}
+		//}
 		return nil
 	}, nil)
 	if err != nil {

@@ -228,7 +228,7 @@ func (lm *Manager) layout(g *gocui.Gui, curMaxX, curMaxY int) error {
 	}
 	lm.lastHeaderArea = area
 
-	// plan footers... don't layout until all columns have been layedout. This is necessary since we must layout from
+	// plan footers... don't layout until all columns have been layed out. This is necessary since we must layout from
 	// top to bottom, but we need the real estate planned for the footers to determine the bottom of the columns.
 	var footerArea = area
 	area, footerHeights := lm.planFooters(g, area)
@@ -241,7 +241,7 @@ func (lm *Manager) layout(g *gocui.Gui, curMaxX, curMaxY int) error {
 	// columns...
 	area, err = lm.planAndLayoutColumns(g, area)
 	if err != nil {
-		log.Errorf("column layout failure: ", err)
+		log.Errorf("column layout failure: %+v", err)
 		return nil
 	}
 
@@ -253,7 +253,7 @@ func (lm *Manager) layout(g *gocui.Gui, curMaxX, curMaxY int) error {
 	// footers... layout according to the original available area and planned heights
 	err = lm.layoutFooters(g, footerArea, footerHeights)
 	if err != nil {
-		log.Errorf("footer layout failure: ", err)
+		log.Errorf("footer layout failure: %+v", err)
 		return nil
 	}
 

@@ -24,7 +24,7 @@ type FileTreeModel struct {
 	// parent working directory - File Panel is build from this point
 	pwd *FileNode
 
-	// number of files in this Tree
+	// number of files and folders in this Tree
 	// NOTE: this number is different from the len(pwd.Children)
 	Size int
 
@@ -37,6 +37,8 @@ func NewFileTreeModel() (tree *FileTreeModel) {
 	tree = new(FileTreeModel)
 	tree.Size = 0
 	tree.Root = new(FileNode)
+	tree.Root.fqfp = "/"
+	tree.Root.Name = "/"
 	tree.Root.Tree = tree
 	tree.Root.Children = make(map[string]*FileNode)
 	tree.Id = uuid.New()
