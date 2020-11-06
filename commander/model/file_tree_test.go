@@ -36,16 +36,16 @@ func TestTreePwdString(t *testing.T) {
 	varLog.AddChild("kern.log", FileInfo{})
 
 	// format: <pwd: expectedOutput>
-	fixtures := map[string]string{
-		"/": "etc\nusr\nvar\n",
-		"/etc": "..\n",
-		"/usr": "..\nbin\n",
-		"/usr/bin": "..\nawk\ngawk\n",
-		"/var/": "..\nlib\nlog\n",
+	fixture := map[string]string{
+		"/":         "etc\nusr\nvar\n",
+		"/etc":      "..\n",
+		"/usr":      "..\nbin\n",
+		"/usr/bin":  "..\nawk\ngawk\n",
+		"/var/":     "..\nlib\nlog\n",
 		"/var/log/": "..\nkern.log\nsyslog\n",
 	}
 
-	for pwd, expectedOutput := range fixtures {
+	for pwd, expectedOutput := range fixture {
 		tree.SetPwd(pwd)
 		actual := tree.String(false)
 
@@ -56,74 +56,55 @@ func TestTreePwdString(t *testing.T) {
 	}
 }
 
-func TestString(t *testing.T) {
-	tree := NewFileTreeModel()
-	tree.Root.AddChild("1 node!", FileInfo{})
-	tree.Root.AddChild("2 node!", FileInfo{})
-	tree.Root.AddChild("3 node!", FileInfo{})
-	four := tree.Root.AddChild("4 node!", FileInfo{})
-	tree.Root.AddChild("5 node!", FileInfo{})
-	four.AddChild("6, one level down...", FileInfo{})
-
-	expected :=
-		`├── 1 node!
-├── 2 node!
-├── 3 node!
-├── 4 node!
-│   └── 6, one level down...
-└── 5 node!
-`
-	actual := tree.String(false)
-
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
-	}
-
-}
-
 func TestStringBetween(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/systemd", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+
+	// format: <pwd: expectedOutput>
+	fixturePaths := []string{
+		"/var/lib/sudo",
+		"/var/lib/systemd",
+		"/var/lib/snmp",
+		"/var/lib/grub",
+		"/var/lib/fprint",
+		"/var/lib/apt",
+		"/var/lib/alsa",
 	}
 
-	expected :=
-		`│       └── public
-├── tmp
-│   └── nonsense
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
+	}
+
+	tree.SetPwd("/var/lib")
+	expected := `..
+alsa
+apt
+fprint
+grub
+snmp
+sudo
+systemd
 `
-	actual := tree.StringBetween(3, 5, false)
-
+	actual := tree.String(false)
 	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
+		t.Errorf("Expected tree representation: \n--->%s<---\nGot:\n--->%s<---", expected, actual)
+	}
+
+	expected = `fprint
+grub
+`
+	actual = tree.StringBetween(3, 5, false)
+	if expected != actual {
+		t.Errorf("Expected tree representation: \n--->%s<---\nGot:\n--->%s<---", expected, actual)
 	}
 
 }
 
-func TestRejectPurelyRelativePath(t *testing.T) {
+func TestRejectRelativePath(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("./etc/nginx/nginx.conf", FileInfo{})
+	_, _, err := tree.AddPath("./var/lib/systemd", FileInfo{})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
@@ -137,16 +118,12 @@ func TestRejectPurelyRelativePath(t *testing.T) {
 
 func TestAddRelativePath(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("./etc/nginx/nginx.conf", FileInfo{})
+	_, _, err := tree.AddPath("./var/lib/systemd", FileInfo{})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	expected :=
-		`└── etc
-    └── nginx
-        └── nginx.conf
-`
+	expected := "/var/lib/systemd"
 	actual := tree.String(false)
 
 	if expected != actual {

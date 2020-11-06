@@ -21,7 +21,8 @@ type FileTreeModel struct {
 	// absolute root of the filesystem
 	Root *FileNode
 
-	// parent working directory - File Panel is build from this point
+	// parent working directory - pointer to a node in the tree
+	// File Panel is build from this point
 	pwd *FileNode
 
 	// number of files and folders in this Tree
@@ -59,8 +60,12 @@ func (tree *FileTreeModel) SetPwd(fqfp string) error {
 	return nil
 }
 
-func (tree *FileTreeModel) getSortedChildrenKeys() []string {
+func (tree *FileTreeModel) sortedNamesInPwd() []string {
 	var keys []string
+
+	if tree.pwd != tree.Root {
+		keys = append(keys, "..")
+	}
 	for key := range tree.pwd.Children {
 		keys = append(keys, key)
 	}
@@ -72,7 +77,7 @@ func (tree *FileTreeModel) getSortedChildrenKeys() []string {
 
 // GetNodeAt returns FileNode representing n-th element in the FileTree by the 0-based index
 func (tree *FileTreeModel) GetNodeAt(index int) *FileNode {
-	keys := tree.getSortedChildrenKeys()
+	keys := tree.sortedNamesInPwd()
 
 	if tree.pwd != tree.Root {
 		if index == 0 {
@@ -86,6 +91,18 @@ func (tree *FileTreeModel) GetNodeAt(index int) *FileNode {
 		childKey := keys[index]
 		return tree.Root.Children[childKey]
 	}
+}
+
+// GetNodeByName returns FileNode by name in the subtree represented by PWD; supports ".." name
+// returns nil if name can not be found
+func (tree *FileTreeModel) GetNodeByName(name string) *FileNode {
+	if node, ok := tree.pwd.Children[name]; ok {
+		return node
+	}
+	if name == ".." && tree.pwd != tree.Root {
+		return tree.pwd
+	}
+	return nil
 }
 
 func (tree *FileTreeModel) VisibleSize() int {
@@ -103,6 +120,8 @@ func (tree *FileTreeModel) String(showAttributes bool) string {
 }
 
 // StringBetween returns a partial tree in an ASCII representation.
+// start is inclusive, 0-based index pointer
+// stop is exclusive, 0-based index pointer
 func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) string {
 	// account for use case when list of available files is less than available visual area
 	stop = utils.MinOf(stop, tree.VisibleSize())
@@ -112,27 +131,20 @@ func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) s
 		if showAttributes {
 			line += node.MetadataString() + " "
 		}
-		line += node.String() + newLine
+		if node == tree.pwd {
+			line += ".." + newLine
+		} else {
+			line += node.String() + newLine
+		}
 		return line
 	}
 
 	var result string
-	if start == 0 {
-		if tree.pwd != tree.Root {
-			if showAttributes {
-				result += tree.pwd.Parent.MetadataString() + " "
-			}
-			result += ".." + newLine
-
-			stop -= 1
-		}
-	}
-
-	keys := tree.getSortedChildrenKeys()
+	keys := tree.sortedNamesInPwd()
 	for i := start; i < stop; i++ {
-		childKey := keys[i]
-		childNode := tree.pwd.Children[childKey]
-		result += singleLine(childNode)
+		nodeNames := keys[i]
+		node := tree.GetNodeByName(nodeNames)
+		result += singleLine(node)
 	}
 
 	return result
