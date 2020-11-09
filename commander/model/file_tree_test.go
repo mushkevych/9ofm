@@ -370,33 +370,35 @@ echo
 }
 
 func TestCompareWithNoChanges(t *testing.T) {
-	lowerTree := NewFileTreeModel()
-	upperTree := NewFileTreeModel()
-	paths := [...]string{"/etc", "/etc/sudoers", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/usr"}
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
+	fixturePaths := [...]string{"/etc", "/etc/sudoers", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/usr"}
 
-	for _, value := range paths {
-		fakeData := FileInfo{
+	for _, value := range fixturePaths {
+		dummyInfo := FileInfo{
 			Fqfp: value,
 			Mode: 0, // regular file
 			hash: 123,
 		}
-		_, _, err := lowerTree.AddPath(value, fakeData)
+		_, _, err := treeA.AddPath(value, dummyInfo)
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
-		_, _, err = upperTree.AddPath(value, fakeData)
+		_, _, err = treeB.AddPath(value, dummyInfo)
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
 	}
-	failedPaths, err := lowerTree.CompareAndMark(upperTree)
+
+	failedPaths, err := treeA.CompareAndMark(treeB)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
 	if len(failedPaths) > 0 {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
-	asserter := func(n *FileNode) error {
+
+	visitor := func(n *FileNode) error {
 		if n.AbsPath() == "/" {
 			return nil
 		}
@@ -405,21 +407,21 @@ func TestCompareWithNoChanges(t *testing.T) {
 		}
 		return nil
 	}
-	err = lowerTree.VisitDepthChildFirst(asserter, nil)
+	err = treeA.VisitDepthChildFirst(visitor, nil)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestCompareWithAdds(t *testing.T) {
-	lowerTree := NewFileTreeModel()
-	upperTree := NewFileTreeModel()
-	lowerPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin"}
-	upperPaths := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/a/new/fqfp"}
+func TestCompareWithAddons(t *testing.T) {
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
+	fixturePathsA := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin"}
+	fixturePathsB := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/etc/fstab"}
 
-	for _, value := range lowerPaths {
-		_, _, err := lowerTree.AddPath(value, FileInfo{
-			Fqfp: value,
+	for _, fqfp := range fixturePathsA {
+		_, _, err := treeA.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 123,
 		})
@@ -428,9 +430,9 @@ func TestCompareWithAdds(t *testing.T) {
 		}
 	}
 
-	for _, value := range upperPaths {
-		_, _, err := upperTree.AddPath(value, FileInfo{
-			Fqfp: value,
+	for _, fqfp := range fixturePathsB {
+		_, _, err := treeB.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 123,
 		})
@@ -439,24 +441,26 @@ func TestCompareWithAdds(t *testing.T) {
 		}
 	}
 
-	failedAssertions := []error{}
-	failedPaths, err := lowerTree.CompareAndMark(upperTree)
+	var failedAssertions []error
+	failedPaths, err := treeA.CompareAndMark(treeB)
 	if err != nil {
 		t.Errorf("Expected tree compare to have no errors, got: %v", err)
 	}
 	if len(failedPaths) > 0 {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
-	asserter := func(n *FileNode) error {
 
+	visitor := func(n *FileNode) error {
 		p := n.AbsPath()
 		if p == "/" {
 			return nil
-		} else if stringInSlice(p, []string{"/usr/bin/bash", "/a", "/a/new", "/a/new/fqfp"}) {
+		} else if stringInSlice(p, []string{"/usr/bin/bash", "/etc/fstab"}) {
+			// two files were "added" in treeB
 			if err := AssertDiffType(n, Added); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
-		} else if stringInSlice(p, []string{"/usr/bin", "/usr"}) {
+		} else if stringInSlice(p, []string{"/usr", "/usr/bin", "/etc"}) {
+			// three folders contains differences and as results are considered "modified" in treeB
 			if err := AssertDiffType(n, Modified); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
@@ -467,7 +471,7 @@ func TestCompareWithAdds(t *testing.T) {
 		}
 		return nil
 	}
-	err = lowerTree.VisitDepthChildFirst(asserter, nil)
+	err = treeA.VisitDepthChildFirst(visitor, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
@@ -482,21 +486,23 @@ func TestCompareWithAdds(t *testing.T) {
 }
 
 func TestCompareWithChanges(t *testing.T) {
-	lowerTree := NewFileTreeModel()
-	upperTree := NewFileTreeModel()
-	changedPaths := []string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin"}
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
+	fixturePaths := []string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin"}
 
-	for _, value := range changedPaths {
-		_, _, err := lowerTree.AddPath(value, FileInfo{
-			Fqfp: value,
+	// use-case different hash
+	for _, fqfp := range fixturePaths {
+		_, _, err := treeA.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 123,
 		})
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
-		_, _, err = upperTree.AddPath(value, FileInfo{
-			Fqfp: value,
+
+		_, _, err = treeB.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 456,
 		})
@@ -505,34 +511,32 @@ func TestCompareWithChanges(t *testing.T) {
 		}
 	}
 
-	chmodPath := "/etc/non-data-change"
-
-	_, _, err := lowerTree.AddPath(chmodPath, FileInfo{
+	// use-case different file permissions
+	chmodPath := "/etc/fstab"
+	_, _, err := treeA.AddPath(chmodPath, FileInfo{
 		Fqfp: chmodPath,
-		Mode: 0, // regular file
+		Mode: 0777,
 		hash: 123,
 	})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	_, _, err = upperTree.AddPath(chmodPath, FileInfo{
+	_, _, err = treeB.AddPath(chmodPath, FileInfo{
 		Fqfp: chmodPath,
-		Mode: 0, // regular file
+		Mode: 0,
 		hash: 123,
 	})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
+	fixturePaths = append(fixturePaths, chmodPath)
 
-	changedPaths = append(changedPaths, chmodPath)
-
-	chownPath := "/etc/non-data-change-2"
-
-	_, _, err = lowerTree.AddPath(chmodPath, FileInfo{
+	// use-case different owner
+	chownPath := "/etc/gshadow"
+	_, _, err = treeA.AddPath(chmodPath, FileInfo{
 		Fqfp: chownPath,
 		Mode: 0, // regular file,
-		hash: 123,
 		Gid:  0,
 		Uid:  0,
 	})
@@ -540,10 +544,9 @@ func TestCompareWithChanges(t *testing.T) {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	_, _, err = upperTree.AddPath(chmodPath, FileInfo{
+	_, _, err = treeB.AddPath(chmodPath, FileInfo{
 		Fqfp: chownPath,
 		Mode: 0, // regular file
-		hash: 123,
 		Gid:  12,
 		Uid:  12,
 	})
@@ -551,21 +554,21 @@ func TestCompareWithChanges(t *testing.T) {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	changedPaths = append(changedPaths, chownPath)
-
-	failedPaths, err := lowerTree.CompareAndMark(upperTree)
+	fixturePaths = append(fixturePaths, chownPath)
+	failedPaths, err := treeA.CompareAndMark(treeB)
 	if err != nil {
 		t.Errorf("unable to compare and mark: %+v", err)
 	}
 	if len(failedPaths) > 0 {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
-	failedAssertions := []error{}
-	asserter := func(n *FileNode) error {
+
+	var failedAssertions []error
+	visitor := func(n *FileNode) error {
 		p := n.AbsPath()
 		if p == "/" {
 			return nil
-		} else if stringInSlice(p, changedPaths) {
+		} else if stringInSlice(p, fixturePaths) {
 			if err := AssertDiffType(n, Modified); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
@@ -576,7 +579,7 @@ func TestCompareWithChanges(t *testing.T) {
 		}
 		return nil
 	}
-	err = lowerTree.VisitDepthChildFirst(asserter, nil)
+	err = treeA.VisitDepthChildFirst(visitor, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
@@ -591,8 +594,8 @@ func TestCompareWithChanges(t *testing.T) {
 }
 
 func TestCompareWithRemoves(t *testing.T) {
-	lowerTree := NewFileTreeModel()
-	upperTree := NewFileTreeModel()
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
 	lowerPaths := [...]string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin", "/root", "/root/example", "/root/example/some1", "/root/example/some2"}
 	upperPaths := [...]string{"/.wh.etc", "/usr", "/usr/.wh.bin", "/root/.wh.example"}
 
@@ -602,7 +605,7 @@ func TestCompareWithRemoves(t *testing.T) {
 			Mode: 0, // regular file
 			hash: 123,
 		}
-		_, _, err := lowerTree.AddPath(value, fakeData)
+		_, _, err := treeA.AddPath(value, fakeData)
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
@@ -614,13 +617,13 @@ func TestCompareWithRemoves(t *testing.T) {
 			Mode: 0, // regular file
 			hash: 123,
 		}
-		_, _, err := upperTree.AddPath(value, fakeData)
+		_, _, err := treeB.AddPath(value, fakeData)
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
 	}
 
-	failedPaths, err := lowerTree.CompareAndMark(upperTree)
+	failedPaths, err := treeA.CompareAndMark(treeB)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
@@ -647,7 +650,7 @@ func TestCompareWithRemoves(t *testing.T) {
 		}
 		return nil
 	}
-	err = lowerTree.VisitDepthChildFirst(asserter, nil)
+	err = treeA.VisitDepthChildFirst(asserter, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
