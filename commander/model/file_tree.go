@@ -42,6 +42,7 @@ func NewFileTreeModel() (tree *FileTreeModel) {
 	tree.Root.Name = "/"
 	tree.Root.Tree = tree
 	tree.Root.Children = make(map[string]*FileNode)
+	tree.pwd = tree.Root
 	tree.Id = uuid.New()
 	return tree
 }
@@ -173,7 +174,7 @@ func (tree *FileTreeModel) Clone() *FileTreeModel {
 // Visitor is a function that processes, observes, or otherwise transforms the given node
 type Visitor func(*FileNode) error
 
-// VisitEvaluator is a function that indicates whether the given node should be visited by a Visitor.
+// VisitEvaluator is a function that returns True if the given node should be visited by a Visitor.
 type VisitEvaluator func(*FileNode) bool
 
 // VisitDepthChildFirst iterates the given tree depth-first, evaluating the deepest depths first (visit on bubble up)

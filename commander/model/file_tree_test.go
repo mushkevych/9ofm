@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -59,7 +60,6 @@ func TestTreePwdString(t *testing.T) {
 func TestStringBetween(t *testing.T) {
 	tree := NewFileTreeModel()
 
-	// format: <pwd: expectedOutput>
 	fixturePaths := []string{
 		"/var/lib/sudo",
 		"/var/lib/systemd",
@@ -134,276 +134,239 @@ func TestAddRelativePath(t *testing.T) {
 
 func TestAddPath(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/systemd", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+
+	fixturePaths := []string{
+		"/bin/cat",
+		"/bin/chmod",
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
 	}
 
-	expected :=
-		`├── etc
-│   └── nginx
-│       ├── nginx.conf
-│       └── public
-├── tmp
-│   └── nonsense
-└── var
-    └── run
-        ├── bashful
-        └── systemd
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
+	}
+
+	tree.SetPwd("/bin")
+	expected := `..
+cat
+chmod
+chown
+cp
+date
+dd
+df
+dmesg
+echo
 `
 	actual := tree.String(false)
-
 	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
-	}
-
-}
-
-func TestAddWhiteoutPath(t *testing.T) {
-	tree := NewFileTreeModel()
-	node, _, err := tree.AddPath("usr/local/lib/python3.7/site-packages/pip/.wh..wh..opq", FileInfo{})
-	if err != nil {
-		t.Errorf("expected no error but got: %v", err)
-	}
-	if node != nil {
-		t.Errorf("expected node to be nil, but got: %v", node)
-	}
-	expected :=
-		`└── usr
-    └── local
-        └── lib
-            └── python3.7
-                └── site-packages
-                    └── pip
-`
-	actual := tree.String(false)
-
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
+		t.Errorf("Expected tree representation: \n--->%s<---\nGot:\n--->%s<---", expected, actual)
 	}
 }
 
 func TestRemovePath(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/systemd", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	fixturePaths := []string{
+		"/bin/cat",
+		"/bin/chmod",
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
+		"/var/lib/sudo",
+		"/var/lib/systemd",
+		"/var/lib/snmp",
+		"/var/lib/grub",
+		"/var/lib/fprint",
+		"/var/lib/apt",
+		"/var/lib/alsa",
 	}
 
-	err = tree.RemovePath("/var/run/bashful")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	err = tree.RemovePath("/tmp")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
 	}
 
-	expected :=
-		`├── etc
-│   └── nginx
-│       ├── nginx.conf
-│       └── public
-└── var
-    └── run
-        └── systemd
-`
-	actual := tree.String(false)
-
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
+	fixtureDeletes := []string{
+		"/bin/cat",
+		"/bin/chmod",
+		"/var/lib/apt",
+		"/var/lib/alsa",
+	}
+	for _, element := range fixtureDeletes {
+		err := tree.RemovePath(element)
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
 	}
 
+	// format: <pwd: expectedOutput>
+	fixtureOutput := map[string]string{
+		"/bin":         `..
+chown
+cp
+date
+dd
+df
+dmesg
+echo
+`,
+		"/var/lib":      `..
+fprint
+grub
+snmp
+sudo
+systemd
+`,
+	}
+
+	for pwd, expectedOutput := range fixtureOutput {
+		tree.SetPwd(pwd)
+		actual := tree.String(false)
+
+		if expectedOutput != actual {
+			t.Errorf("Expected tree representation for %s:\n--->%s<---\nGot:\n--->%s<---",
+				pwd, expectedOutput, actual)
+		}
+	}
 }
 
 func TestStack(t *testing.T) {
-	payloadKey := "/var/run/systemd"
-	payloadValue := FileInfo{
-		Fqfp: "yup",
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
+
+	fixturePathsA := []string{
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
 	}
 
-	tree1 := NewFileTreeModel()
-
-	_, _, err := tree1.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree1.AddPath(payloadKey, FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree1.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree1.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree1.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	fixturePathsB := []string{
+		"/var/lib/sudo",
+		"/var/lib/systemd",
+		"/var/lib/snmp",
+		"/var/lib/grub",
+		"/var/lib/fprint",
 	}
 
-	tree2 := NewFileTreeModel()
-	// add new files
-	_, _, err = tree2.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	// modify current files
-	_, _, err = tree2.AddPath(payloadKey, payloadValue)
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	// whiteout the following files
-	_, _, err = tree2.AddPath("/var/run/.wh.bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree2.AddPath("/.wh.tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	// ignore opaque whiteout files entirely
-	node, _, err := tree2.AddPath("/.wh..wh..opq", FileInfo{})
-	if err != nil {
-		t.Errorf("expected no error on whiteout file add, but got %v", err)
-	}
-	if node != nil {
-		t.Errorf("expected no node on whiteout file add, but got %v", node)
+	for _, element := range fixturePathsA {
+		_, _, err := treeA.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
 	}
 
-	failedPaths, err := tree1.Stack(tree2)
+	for _, element := range fixturePathsB {
+		_, _, err := treeB.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
+	}
 
+	expectedOutputA := `..
+chown
+cp
+date
+dd
+df
+dmesg
+echo
+`
+	treeA.SetPwd("/bin")
+	actual := treeA.String(false)
+	if expectedOutputA != actual {
+		t.Errorf("Expected tree representation for:\n--->%s<---\nGot:\n--->%s<---", expectedOutputA, actual)
+	}
+
+ expectedOutputB := `..
+fprint
+grub
+snmp
+sudo
+systemd
+`
+	treeB.SetPwd("/var/lib")
+	actual = treeB.String(false)
+	if expectedOutputB != actual {
+		t.Errorf("Expected tree representation for:\n--->%s<---\nGot:\n--->%s<---", expectedOutputB, actual)
+	}
+
+	failedPaths, err := treeA.Stack(treeB)
 	if err != nil {
 		t.Errorf("Could not stack refTrees: %v", err)
 	}
-
 	if len(failedPaths) > 0 {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
 
-	expected :=
-		`├── etc
-│   └── nginx
-│       ├── nginx.conf
-│       └── public
-└── var
-    └── run
-        └── systemd
-`
-
-	node, err = tree1.GetNode(payloadKey)
-	if err != nil {
-		t.Errorf("Expected '%s' to still exist, but it doesn't", payloadKey)
+	//treeA.SetPwd("/bin")
+	actual = treeA.String(false)
+	if expectedOutputA != actual {
+		t.Errorf("Expected tree representation for:\n--->%s<---\nGot:\n--->%s<---", expectedOutputA, actual)
 	}
 
-	if node == nil || node.Data.FileInfo.Fqfp != payloadValue.Fqfp {
-		t.Errorf("Expected '%s' value to be %+v but got %+v", payloadKey, payloadValue, node.Data.FileInfo)
+	treeA.SetPwd("/var/lib")
+	actual = treeA.String(false)
+	if expectedOutputB != actual {
+		t.Errorf("Expected tree representation for:\n--->%s<---\nGot:\n--->%s<---", expectedOutputA, actual)
 	}
-
-	actual := tree1.String(false)
-
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
-	}
-
 }
 
-func TestCopy(t *testing.T) {
+func TestClone(t *testing.T) {
 	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/systemd", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	fixturePaths := []string{
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
 	}
 
-	err = tree.RemovePath("/var/run/bashful")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	err = tree.RemovePath("/tmp")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
 	}
 
-	expected :=
-		`├── etc
-│   └── nginx
-│       ├── nginx.conf
-│       └── public
-└── var
-    └── run
-        └── systemd
+	expectedOutput := `..
+chown
+cp
+date
+dd
+df
+dmesg
+echo
 `
-
-	NewFileTree := tree.Clone()
-	actual := NewFileTree.String(false)
-
-	if expected != actual {
-		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
+	tree.SetPwd("/bin")
+	actual := tree.String(false)
+	if expectedOutput != actual {
+		t.Errorf("Expected tree representation for:\n--->%s<---\nGot:\n--->%s<---", expectedOutput, actual)
 	}
 
+	actual = tree.Clone().String(false)
+	if expectedOutput != actual {
+		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expectedOutput, actual)
+	}
 }
 
 func TestCompareWithNoChanges(t *testing.T) {
@@ -699,117 +662,145 @@ func TestCompareWithRemoves(t *testing.T) {
 }
 
 func TestStackRange(t *testing.T) {
-	tree := NewFileTreeModel()
-	_, _, err := tree.AddPath("/etc/nginx/nginx.conf", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/etc/nginx/public", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/systemd", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/var/run/bashful", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	_, _, err = tree.AddPath("/tmp/nonsense", FileInfo{})
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	treeA := NewFileTreeModel()
+	treeB := NewFileTreeModel()
+	treeC := NewFileTreeModel()
+
+	fixturePathsA := []string{
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
 	}
 
-	err = tree.RemovePath("/var/run/bashful")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
-	}
-	err = tree.RemovePath("/tmp")
-	if err != nil {
-		t.Errorf("could not setup test: %v", err)
+	fixturePathsB := []string{
+		"/var/lib/sudo",
+		"/var/lib/systemd",
+		"/var/lib/snmp",
+		"/var/lib/grub",
+		"/var/lib/fprint",
 	}
 
-	lowerTree := NewFileTreeModel()
-	upperTree := NewFileTreeModel()
-	lowerPaths := [...]string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin"}
-	upperPaths := [...]string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin"}
+	fixturePathsC := []string{
+		"/etc/aliases",
+		"/etc/bash.bashrc",
+		"/etc/cups",
+		"/etc/dhcp",
+		"/etc/fstab",
+	}
 
-	for _, value := range lowerPaths {
-		fakeData := FileInfo{
-			Fqfp: value,
-			Mode: 0, // regular file
-			hash: 123,
-		}
-		_, _, err = lowerTree.AddPath(value, fakeData)
-		if err != nil {
-			t.Errorf("could not setup test: %v", err)
+	mapping := map[*FileTreeModel] []string{
+		treeA: fixturePathsA,
+		treeB: fixturePathsB,
+		treeC: fixturePathsC,
+	}
+
+	for tree, fixturePaths := range mapping {
+		for _, element := range fixturePaths {
+			_, _, err := tree.AddPath(element, FileInfo{})
+			if err != nil {
+				t.Errorf("could not setup test: %v", err)
+			}
 		}
 	}
 
-	for _, value := range upperPaths {
-		fakeData := FileInfo{
-			Fqfp: value,
-			Mode: 0, // regular file
-			hash: 456,
-		}
-		_, _, err = upperTree.AddPath(value, fakeData)
-		if err != nil {
-			t.Errorf("could not setup test: %v", err)
-		}
-	}
-	trees := []*FileTreeModel{lowerTree, upperTree, tree}
-	_, failedPaths, err := StackTreeRange(trees, 0, 2)
+	trees := []*FileTreeModel{treeA, treeB, treeC}
+	tree, failedPaths, err := StackTreeRange(trees, 0, 2)
 	if len(failedPaths) > 0 {
 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// format: <pwd: expectedOutput>
+	fixtureOutput := map[string]string{
+		"/bin":         `..
+chown
+cp
+date
+dd
+df
+`,
+		"/var/lib":      `..
+fprint
+grub
+snmp
+sudo
+systemd
+`,
+		"/etc":      `..
+aliases
+bash.bashrc
+cups
+dhcp
+fstab
+`,
+	}
+
+	for pwd, expectedOutput := range fixtureOutput {
+		tree.SetPwd(pwd)
+		actual := tree.String(false)
+
+		if expectedOutput != actual {
+			t.Errorf("Expected tree representation for %s:\n--->%s<---\nGot:\n--->%s<---",
+				pwd, expectedOutput, actual)
+		}
+	}
 }
 
 func TestRemoveOnIterate(t *testing.T) {
-
 	tree := NewFileTreeModel()
-	paths := [...]string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin", "/usr/something"}
+	fixturePaths := []string{
+		"/bin/cat",
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
+	}
 
-	for _, value := range paths {
-		fakeData := FileInfo{
-			Fqfp: value,
-			Mode: 0, // regular file
-			hash: 123,
-		}
-		node, _, err := tree.AddPath(value, fakeData)
-		if err == nil && stringInSlice(node.AbsPath(), []string{"/etc"}) {
-			//node.Data.ViewInfo.Hidden = true
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
 		}
 	}
 
-	err := tree.VisitDepthChildFirst(func(node *FileNode) error {
-		//if node.Data.ViewInfo.Hidden {
-		//	err := tree.RemovePath(node.AbsPath())
-		//	if err != nil {
-		//		t.Errorf("could not setup test: %v", err)
-		//	}
-		//}
+	// Visitor is a function that processes, observes, or otherwise transforms the given node
+	visitor := func(node *FileNode) error {
+		err := tree.RemovePath(node.AbsPath())
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
 		return nil
-	}, nil)
+	}
+
+	// VisitEvaluator is a function that returns True if the given node should be visited by a Visitor.
+	evaluator := func(node *FileNode) bool {
+		return strings.Contains(node.AbsPath(), "dmesg") || strings.Contains(node.AbsPath(), "echo")
+	}
+
+	// remove /bin/echo and /bin/dmesg
+	err := tree.VisitDepthChildFirst(visitor, evaluator)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	expected :=
-		`└── usr
-    ├── bin
-    └── something
+	expected := `..
+cat
+chown
+cp
+date
+dd
+df
 `
+	tree.SetPwd("/bin/")
 	actual := tree.String(false)
 	if expected != actual {
 		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
 	}
-
 }
