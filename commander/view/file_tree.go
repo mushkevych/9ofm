@@ -194,7 +194,7 @@ func (v *FileTreeView) Update(filterRegex *regexp.Regexp, width, height int) err
 	v.refHeight = height
 
 	// keep the v selection in parity with the current DiffType selection
-	err := v.ModelTree.VisitDepthChildFirst(func(node *model.FileNode) error {
+	err := v.ModelTree.DepthFirstSearch(func(node *model.FileNode) error {
 		// select first node that matches the current file filter regex
 		if filterRegex != nil {
 			match := filterRegex.FindString(node.AbsPath())

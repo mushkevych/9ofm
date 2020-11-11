@@ -123,13 +123,12 @@ func TestAddRelativePath(t *testing.T) {
 		t.Errorf("could not setup test: %v", err)
 	}
 
-	expected := "/var/lib/systemd"
+	expected := "var\n"
 	actual := tree.String(false)
 
 	if expected != actual {
 		t.Errorf("Expected tree string:\n--->%s<---\nGot:\n--->%s<---", expected, actual)
 	}
-
 }
 
 func TestAddPath(t *testing.T) {
@@ -390,12 +389,9 @@ func TestCompareWithNoChanges(t *testing.T) {
 		}
 	}
 
-	failedPaths, err := treeA.CompareAndMark(treeB)
+	err := CompareAndMark(treeA, treeB)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
-	}
-	if len(failedPaths) > 0 {
-		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
 
 	visitor := func(n *FileNode) error {
@@ -407,7 +403,11 @@ func TestCompareWithNoChanges(t *testing.T) {
 		}
 		return nil
 	}
-	err = treeA.VisitDepthChildFirst(visitor, nil)
+	err = treeA.DepthFirstSearch(visitor, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	err = treeB.DepthFirstSearch(visitor, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -442,15 +442,27 @@ func TestCompareWithAddons(t *testing.T) {
 	}
 
 	var failedAssertions []error
-	failedPaths, err := treeA.CompareAndMark(treeB)
+	err := CompareAndMark(treeA, treeB)
 	if err != nil {
 		t.Errorf("Expected tree compare to have no errors, got: %v", err)
 	}
-	if len(failedPaths) > 0 {
-		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
+
+	visitorA := func(n *FileNode) error {
+		if n.AbsPath() == "/" {
+			return nil
+		}
+		if (n.Data.DiffType) != Unmodified {
+			t.Errorf("Expecting node at %s to have DiffType unchanged, but had %v", n.AbsPath(), n.Data.DiffType)
+		}
+		return nil
 	}
 
-	visitor := func(n *FileNode) error {
+	err = treeA.DepthFirstSearch(visitorA, nil)
+	if err != nil {
+		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
+	}
+
+	visitorB := func(n *FileNode) error {
 		p := n.AbsPath()
 		if p == "/" {
 			return nil
@@ -471,7 +483,7 @@ func TestCompareWithAddons(t *testing.T) {
 		}
 		return nil
 	}
-	err = treeA.VisitDepthChildFirst(visitor, nil)
+	err = treeB.DepthFirstSearch(visitorB, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
@@ -555,12 +567,9 @@ func TestCompareWithChanges(t *testing.T) {
 	}
 
 	fixturePaths = append(fixturePaths, chownPath)
-	failedPaths, err := treeA.CompareAndMark(treeB)
+	err = CompareAndMark(treeA, treeB)
 	if err != nil {
 		t.Errorf("unable to compare and mark: %+v", err)
-	}
-	if len(failedPaths) > 0 {
-		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
 	}
 
 	var failedAssertions []error
@@ -579,7 +588,7 @@ func TestCompareWithChanges(t *testing.T) {
 		}
 		return nil
 	}
-	err = treeA.VisitDepthChildFirst(visitor, nil)
+	err = treeA.DepthFirstSearch(visitor, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
@@ -596,50 +605,46 @@ func TestCompareWithChanges(t *testing.T) {
 func TestCompareWithRemoves(t *testing.T) {
 	treeA := NewFileTreeModel()
 	treeB := NewFileTreeModel()
-	lowerPaths := [...]string{"/etc", "/usr", "/etc/hosts", "/etc/sudoers", "/usr/bin", "/root", "/root/example", "/root/example/some1", "/root/example/some2"}
-	upperPaths := [...]string{"/.wh.etc", "/usr", "/usr/.wh.bin", "/root/.wh.example"}
+	fixturePathsA := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin", "/usr/bin/bash", "/etc/fstab"}
+	fixturePathsB := [...]string{"/etc", "/etc/sudoers", "/usr", "/etc/hosts", "/usr/bin"}
 
-	for _, value := range lowerPaths {
-		fakeData := FileInfo{
-			Fqfp: value,
+	for _, fqfp := range fixturePathsA {
+		_, _, err := treeA.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 123,
-		}
-		_, _, err := treeA.AddPath(value, fakeData)
+		})
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
 	}
 
-	for _, value := range upperPaths {
-		fakeData := FileInfo{
-			Fqfp: value,
+	for _, fqfp := range fixturePathsB {
+		_, _, err := treeB.AddPath(fqfp, FileInfo{
+			Fqfp: fqfp,
 			Mode: 0, // regular file
 			hash: 123,
-		}
-		_, _, err := treeB.AddPath(value, fakeData)
+		})
 		if err != nil {
 			t.Errorf("could not setup test: %v", err)
 		}
 	}
 
-	failedPaths, err := treeA.CompareAndMark(treeB)
+	err := CompareAndMark(treeA, treeB)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}
-	if len(failedPaths) > 0 {
-		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
-	}
-	failedAssertions := []error{}
-	asserter := func(n *FileNode) error {
+
+	var failedAssertions []error
+	visitorA := func(n *FileNode) error {
 		p := n.AbsPath()
 		if p == "/" {
 			return nil
-		} else if stringInSlice(p, []string{"/etc", "/usr/bin", "/etc/hosts", "/etc/sudoers", "/root/example/some1", "/root/example/some2", "/root/example"}) {
-			if err := AssertDiffType(n, Removed); err != nil {
+		} else if stringInSlice(p, []string{"/usr/bin/bash", "/etc/fstab"}) {
+			if err := AssertDiffType(n, Added); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
-		} else if stringInSlice(p, []string{"/usr", "/root"}) {
+		} else if stringInSlice(p, []string{"/usr", "/usr/bin", "/etc"}) {
 			if err := AssertDiffType(n, Modified); err != nil {
 				failedAssertions = append(failedAssertions, err)
 			}
@@ -650,7 +655,22 @@ func TestCompareWithRemoves(t *testing.T) {
 		}
 		return nil
 	}
-	err = treeA.VisitDepthChildFirst(asserter, nil)
+	err = treeA.DepthFirstSearch(visitorA, nil)
+	if err != nil {
+		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
+	}
+
+	visitorB := func(n *FileNode) error {
+		if n.AbsPath() == "/" {
+			return nil
+		}
+		if (n.Data.DiffType) != Unmodified {
+			t.Errorf("Expecting node at %s to have DiffType unchanged, but had %v", n.AbsPath(), n.Data.DiffType)
+		}
+		return nil
+	}
+
+	err = treeB.DepthFirstSearch(visitorB, nil)
 	if err != nil {
 		t.Errorf("Expected no errors when visiting nodes, got: %+v", err)
 	}
@@ -788,7 +808,7 @@ func TestRemoveOnIterate(t *testing.T) {
 	}
 
 	// remove /bin/echo and /bin/dmesg
-	err := tree.VisitDepthChildFirst(visitor, evaluator)
+	err := tree.DepthFirstSearch(visitor, evaluator)
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
 	}

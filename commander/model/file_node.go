@@ -140,7 +140,7 @@ func (node *FileNode) MetadataString() string {
 			return nil
 		}
 
-		err := node.VisitDepthChildFirst(sizer, nil)
+		err := node.DepthFirstSearch(sizer, nil)
 		if err != nil {
 			log.Errorf("unable to propagate node for metadata: %+v", err)
 		}
@@ -153,8 +153,8 @@ func (node *FileNode) MetadataString() string {
 	return diffTypeColor[node.Data.DiffType].Sprint(fmt.Sprintf(AttributeFormat, dir, fileMode, userGroup, size))
 }
 
-// VisitDepthChildFirst iterates a tree depth-first (starting at this FileNode), evaluating the deepest depths first (visit on bubble up)
-func (node *FileNode) VisitDepthChildFirst(visitor Visitor, evaluator VisitEvaluator) error {
+// DepthFirstSearch starts at the tree root explores as far as possible along each branch before backtracking
+func (node *FileNode) DepthFirstSearch(visitor Visitor, evaluator VisitEvaluator) error {
 	var keys []string
 	for key := range node.Children {
 		keys = append(keys, key)
@@ -162,7 +162,7 @@ func (node *FileNode) VisitDepthChildFirst(visitor Visitor, evaluator VisitEvalu
 	sort.Strings(keys)
 	for _, name := range keys {
 		child := node.Children[name]
-		err := child.VisitDepthChildFirst(visitor, evaluator)
+		err := child.DepthFirstSearch(visitor, evaluator)
 		if err != nil {
 			return err
 		}
@@ -175,39 +175,6 @@ func (node *FileNode) VisitDepthChildFirst(visitor Visitor, evaluator VisitEvalu
 	}
 
 	return nil
-}
-
-// VisitDepthParentFirst iterates a tree depth-first (starting at this FileNode), evaluating the shallowest depths first (visit while sinking down)
-func (node *FileNode) VisitDepthParentFirst(visitor Visitor, evaluator VisitEvaluator) error {
-	var err error
-
-	doVisit := evaluator != nil && evaluator(node) || evaluator == nil
-
-	if !doVisit {
-		return nil
-	}
-
-	// never visit the root node
-	if node != node.Tree.Root {
-		err = visitor(node)
-		if err != nil {
-			return err
-		}
-	}
-
-	var keys []string
-	for key := range node.Children {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, name := range keys {
-		child := node.Children[name]
-		err = child.VisitDepthParentFirst(visitor, evaluator)
-		if err != nil {
-			return err
-		}
-	}
-	return err
 }
 
 // IsLeaf returns true is the current node has no child nodes.

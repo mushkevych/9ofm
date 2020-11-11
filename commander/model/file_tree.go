@@ -159,7 +159,7 @@ func (tree *FileTreeModel) Clone() *FileTreeModel {
 	newTree.SetPwd(tree.pwd.fqfp)
 
 	// update the tree pointers
-	err := newTree.VisitDepthChildFirst(func(node *FileNode) error {
+	err := newTree.DepthFirstSearch(func(node *FileNode) error {
 		node.Tree = newTree
 		return nil
 	}, nil)
@@ -177,14 +177,9 @@ type Visitor func(*FileNode) error
 // VisitEvaluator is a function that returns True if the given node should be visited by a Visitor.
 type VisitEvaluator func(*FileNode) bool
 
-// VisitDepthChildFirst iterates the given tree depth-first, evaluating the deepest depths first (visit on bubble up)
-func (tree *FileTreeModel) VisitDepthChildFirst(visitor Visitor, evaluator VisitEvaluator) error {
-	return tree.Root.VisitDepthChildFirst(visitor, evaluator)
-}
-
-// VisitDepthParentFirst iterates the given tree depth-first, evaluating the shallowest depths first (visit while sinking down)
-func (tree *FileTreeModel) VisitDepthParentFirst(visitor Visitor, evaluator VisitEvaluator) error {
-	return tree.Root.VisitDepthParentFirst(visitor, evaluator)
+// DepthFirstSearch starts at the tree root explores as far as possible along each branch before backtracking
+func (tree *FileTreeModel) DepthFirstSearch(visitor Visitor, evaluator VisitEvaluator) error {
+	return tree.Root.DepthFirstSearch(visitor, evaluator)
 }
 
 // GetNode fetches a single node when given a fully qualified file path - slash-delimited string
@@ -255,70 +250,54 @@ func (tree *FileTreeModel) RemovePath(fqfp string) error {
 	return node.Remove()
 }
 
-type compareMark struct {
-	lowerNode *FileNode
-	upperNode *FileNode
-	tentative DiffType
-	final     DiffType
-}
-
-// CompareAndMark marks the FileNodes in the owning (lower) tree with DiffType annotations when compared to the given (upper) tree.
-func (tree *FileTreeModel) CompareAndMark(upper *FileTreeModel) ([]PathError, error) {
-	// always compare relative to the original, unaltered tree.
-	originalTree := tree
-
-	modifications := make([]compareMark, 0)
-	failed := make([]PathError, 0)
-
-	graft := func(upperNode *FileNode) error {
-		// note: since we are not comparing against the original tree (copying the tree is expensive) we may mark the parent
-		// of an added node incorrectly as modified. This will be corrected later.
-		originalLowerNode, _ := originalTree.GetNode(upperNode.AbsPath())
-
-		if originalLowerNode == nil {
-			_, newNodes, err := tree.AddPath(upperNode.AbsPath(), upperNode.Data.FileInfo)
-			if err != nil {
-				failed = append(failed, NewPathError(upperNode.AbsPath(), ActionAdd, err))
-				return nil
-			}
-			for idx := len(newNodes) - 1; idx >= 0; idx-- {
-				newNode := newNodes[idx]
-				modifications = append(modifications, compareMark{lowerNode: newNode, upperNode: upperNode, tentative: -1, final: Added})
+// CompareAndMark compares this treeA and treeB by performing two passages:
+// 1: iterate over nodes in A and if they are absent in B - mark them as "deleted"
+// 2: iterate over nodes in B and if they are absent in A - mark them as "added"
+// *: rest of the nodes are compared for being "modified"
+// NOTE: for every "added", "deleted" or "modified" node -  all their parents are marked as well as "modified"
+func CompareAndMark(treeA, treeB *FileTreeModel) error {
+	comparator := func(left, right *FileTreeModel) error {
+		visitor := func(rightNode *FileNode) error {
+			leftNode, _ := left.GetNode(rightNode.AbsPath())
+			diffType := leftNode.compare(rightNode)
+			if diffType != Unmodified {
+				rightNode.Data.DiffType = diffType
+				err := markParentsModified(rightNode)
+				if err != nil {
+					return err
+				}
 			}
 			return nil
 		}
 
-		// the file exists in the lower layer
-		lowerNode, _ := tree.GetNode(upperNode.AbsPath())
-		diffType := lowerNode.compare(upperNode)
-		modifications = append(modifications, compareMark{lowerNode: lowerNode, upperNode: upperNode, tentative: diffType, final: -1})
-
+		err := right.DepthFirstSearch(visitor, nil)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
-	// we must visit from the leaves upwards to ensure that diff types can be derived from and assigned to children
-	err := upper.VisitDepthChildFirst(graft, nil)
+
+	err := comparator(treeA, treeB)
 	if err != nil {
-		return failed, err
+		return err
 	}
 
-	// take note of the comparison results on each note in the owning tree.
-	for _, pair := range modifications {
-		if pair.final > 0 {
-			err = pair.lowerNode.AssignDiffType(pair.final)
-			if err != nil {
-				return failed, err
-			}
-		} else if pair.lowerNode.Data.DiffType == Unmodified {
-			err = pair.lowerNode.deriveDiffType(pair.tentative)
-			if err != nil {
-				return failed, err
-			}
+	err = comparator(treeB, treeA)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// markParentsModified traverses all parents and mark them as "modified"
+func markParentsModified(node *FileNode) error {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		err := parent.AssignDiffType(Modified)
+		if err != nil {
+			return err
 		}
-
-		// persist the upper's payload on the owning tree
-		pair.lowerNode.Data.FileInfo = *pair.upperNode.Data.FileInfo.Clone()
 	}
-	return failed, nil
+	return nil
 }
 
 // markRemoved annotates the FileNode at the given fully qualified file path as Removed.
@@ -339,7 +318,7 @@ func (tree *FileTreeModel) Stack(upper *FileTreeModel) (failed []PathError, stac
 		}
 		return nil
 	}
-	stackErr = upper.VisitDepthChildFirst(graft, nil)
+	stackErr = upper.DepthFirstSearch(graft, nil)
 	return failed, stackErr
 }
 
