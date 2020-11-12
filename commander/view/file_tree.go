@@ -40,6 +40,34 @@ type FileTreeView struct {
 	Buffer bytes.Buffer
 }
 
+// NewFileTreeView creates a new view object attached the the global [gocui] screen object.
+func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, err error) {
+	treeViewModel = new(FileTreeView)
+
+	// populate main fields
+	treeViewModel.ShowFileAttributes = configuration.Config.GetBool("filetree.show-attributes")
+	treeViewModel.ModelTree = tree
+	treeViewModel.HiddenDiffTypes = make([]bool, 4)
+
+	hiddenTypes := configuration.Config.GetStringSlice("diff.hide", ",")
+	for _, hType := range hiddenTypes {
+		switch t := strings.ToLower(hType); t {
+		case "added":
+			treeViewModel.HiddenDiffTypes[model.Added] = true
+		case "removed":
+			treeViewModel.HiddenDiffTypes[model.Removed] = true
+		case "modified":
+			treeViewModel.HiddenDiffTypes[model.Modified] = true
+		case "unmodified":
+			treeViewModel.HiddenDiffTypes[model.Unmodified] = true
+		default:
+			return nil, fmt.Errorf("unknown diff.hide value: %s", t)
+		}
+	}
+
+	return treeViewModel, nil
+}
+
 // Setup initializes the UI concerns within the context of a global [gocui] controller object.
 func (v *FileTreeView) Setup(lowerBound, height int) {
 	v.bufferIndexLowerBound = lowerBound
@@ -234,32 +262,4 @@ func (v *FileTreeView) Render() error {
 		}
 	}
 	return nil
-}
-
-// NewFileTreeView creates a new view object attached the the global [gocui] screen object.
-func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, err error) {
-	treeViewModel = new(FileTreeView)
-
-	// populate main fields
-	treeViewModel.ShowFileAttributes = configuration.Config.GetBool("filetree.show-attributes")
-	treeViewModel.ModelTree = tree
-	treeViewModel.HiddenDiffTypes = make([]bool, 4)
-
-	hiddenTypes := configuration.Config.GetStringSlice("diff.hide", ",")
-	for _, hType := range hiddenTypes {
-		switch t := strings.ToLower(hType); t {
-		case "added":
-			treeViewModel.HiddenDiffTypes[model.Added] = true
-		case "removed":
-			treeViewModel.HiddenDiffTypes[model.Removed] = true
-		case "modified":
-			treeViewModel.HiddenDiffTypes[model.Modified] = true
-		case "unmodified":
-			treeViewModel.HiddenDiffTypes[model.Unmodified] = true
-		default:
-			return nil, fmt.Errorf("unknown diff.hide value: %s", t)
-		}
-	}
-
-	return treeViewModel, nil
 }

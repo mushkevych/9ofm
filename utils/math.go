@@ -11,3 +11,15 @@ func MinOf(vars ...int) int {
 
 	return min
 }
+
+func MaxOf(vars ...int) int {
+	max := vars[0]
+
+	for _, i := range vars {
+		if max < i {
+			max = i
+		}
+	}
+
+	return max
+}

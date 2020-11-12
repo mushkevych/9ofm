@@ -125,6 +125,7 @@ func (tree *FileTreeModel) String(showAttributes bool) string {
 // stop is exclusive, 0-based index pointer
 func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) string {
 	// account for use case when list of available files is less than available visual area
+	start = utils.MaxOf(start, 0)
 	stop = utils.MinOf(stop, tree.VisibleSize())
 
 	singleLine := func(node *FileNode) string {

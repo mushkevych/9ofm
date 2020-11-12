@@ -3,16 +3,15 @@ package view
 import (
 	"bytes"
 	"github.com/fatih/color"
-	"github.com/mushkevych/9ofm/commander/format"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
 
+	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/commander/model"
-
-	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 const allowTestDataCapture = false
@@ -74,29 +73,47 @@ func assertTestData(t *testing.T, actualBytes []byte) {
 }
 
 func initializeTestViewModel(t *testing.T) *FileTreeView {
-// 	result := docker.TestAnalysisFromArchive(t, "../../../.data/test-docker-image.tar")
+	tree := model.NewFileTreeModel()
+	view, err := NewFileTreeView(tree)
+	if err != nil {
+		t.Errorf("failed to create File Tree View: %v", err)
+	}
 
-// 	cache := model.NewComparer(result.RefTrees)
-// 	errors := cache.BuildCache()
-// 	if len(errors) > 0 {
-// 		t.Fatalf("%s: unable to build cache: %d errors", t.Name(), len(errors))
-// 	}
+	fixturePaths := []string{
+		"/bin/cat",
+		"/bin/chmod",
+		"/bin/chown",
+		"/bin/cp",
+		"/bin/date",
+		"/bin/dd",
+		"/bin/df",
+		"/bin/dmesg",
+		"/bin/echo",
+
+		"/etc/aliases",
+		"/etc/bash.bashrc",
+		"/etc/cups",
+		"/etc/dhcp",
+		"/etc/fstab",
+
+		"/var/lib/sudo",
+		"/var/lib/systemd",
+		"/var/lib/snmp",
+		"/var/lib/grub",
+		"/var/lib/fprint",
+		"/var/lib/apt",
+		"/var/lib/alsa",
+	}
+
+	for _, element := range fixturePaths {
+		_, _, err := tree.AddPath(element, model.FileInfo{})
+		if err != nil {
+			t.Errorf("could not setup test: %v", err)
+		}
+	}
 
 	format.Selected = color.New(color.ReverseVideo, color.Bold).SprintFunc()
-
-// 	treeStack, failedPaths, err := model.StackTreeRange(result.RefTrees, 0, 0)
-// 	if len(failedPaths) > 0 {
-// 		t.Errorf("expected no filepath errors, got %d", len(failedPaths))
-// 	}
-// 	if err != nil {
-// 		t.Fatalf("%s: unable to stack trees: %v", t.Name(), err)
-// 	}
-// 	vm, err := NewFileTreeView(treeStack, result.RefTrees, cache)
-// 	if err != nil {
-// 		t.Fatalf("%s: unable to create tree ViewModel: %+v", t.Name(), err)
-// 	}
-// 	return vm
-	return nil
+	return view
 }
 
 func runTestCase(t *testing.T, vm *FileTreeView, width, height int, filterRegex *regexp.Regexp) {
@@ -149,16 +166,12 @@ func TestFileTreeRestrictedHeight(t *testing.T) {
 	runTestCase(t, vm, width, height, nil)
 }
 
-func TestFileTreeDirCollapse(t *testing.T) {
+func TestFileTreeDirCursor(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
-
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
 
 	moved := vm.CursorDown()
 	if !moved {
@@ -170,10 +183,6 @@ func TestFileTreeDirCollapse(t *testing.T) {
 		t.Error("unable to cursor down")
 	}
 
-	// collapse /etc
-	err = vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /etc")
-
 	runTestCase(t, vm, width, height, nil)
 }
 
@@ -184,9 +193,6 @@ func TestFileTreeSelectLayer(t *testing.T) {
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
 
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
 	runTestCase(t, vm, width, height, nil)
 }
 
@@ -197,9 +203,6 @@ func TestFileShowAggregateChanges(t *testing.T) {
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
 
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
 	runTestCase(t, vm, width, height, nil)
 }
 
@@ -247,16 +250,12 @@ func TestFileTreePageUp(t *testing.T) {
 	runTestCase(t, vm, width, height, nil)
 }
 
-func TestFileTreeDirCursorRight(t *testing.T) {
+func TestFileTreeDirNavigateTo(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
-
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
 
 	moved := vm.CursorDown()
 	if !moved {
@@ -268,13 +267,9 @@ func TestFileTreeDirCursorRight(t *testing.T) {
 		t.Error("unable to cursor down")
 	}
 
-	// collapse /etc
-	err = vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /etc")
-
 	// expand /etc
-	err = vm.CursorRight(nil)
-	checkError(t, err, "unable to cursor right")
+	//err := vm.NavigateTo(nil)
+	//checkError(t, err, "unable to cursor right")
 
 	runTestCase(t, vm, width, height, nil)
 }
@@ -301,10 +296,6 @@ func TestFileTreeHideAddedRemovedModified(t *testing.T) {
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
 
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
-
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)
 
@@ -324,10 +315,6 @@ func TestFileTreeHideUnmodified(t *testing.T) {
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
 
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
-
 	// hide unmodified files
 	vm.ToggleShowDiffType(model.Unmodified)
 
@@ -340,10 +327,6 @@ func TestFileTreeHideTypeWithFilter(t *testing.T) {
 	width, height := 100, 100
 	vm.Setup(0, height)
 	vm.ShowFileAttributes = true
-
-	// collapse /bin
-	err := vm.ToggleCollapse(nil)
-	checkError(t, err, "unable to collapse /bin")
 
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)
