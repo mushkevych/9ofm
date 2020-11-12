@@ -19,7 +19,7 @@ build:
 	go build -ldflags "-X main.sha1ver=$$(git rev-parse HEAD) -X main.buildTime=$$(date +'%Y-%m-%dT%T')" -gcflags="all=-N -l" -o $(BUILD_PATH)
 
 test:
-	./.scripts/test-coverage.sh
+	./scripts/test-coverage.sh
 
 test-race:
 	go test -cover -v -race ./...
