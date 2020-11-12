@@ -80,14 +80,9 @@ func (tree *FileTreeModel) sortedNamesInPwd() []string {
 func (tree *FileTreeModel) GetNodeAt(index int) *FileNode {
 	keys := tree.sortedNamesInPwd()
 
-	if tree.pwd != tree.Root {
-		if index == 0 {
-			// 1st node is "..", which refers to the tree.pwd
-			return tree.pwd.Parent
-		} else {
-			childKey := keys[index-1]
-			return tree.pwd.Children[childKey]
-		}
+	if index == 0 && tree.pwd != tree.Root {
+		// 1st node is "..", which refers to the tree.pwd
+		return tree.pwd.Parent
 	} else {
 		childKey := keys[index]
 		return tree.Root.Children[childKey]
