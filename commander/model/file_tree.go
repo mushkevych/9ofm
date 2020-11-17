@@ -61,6 +61,10 @@ func (tree *FileTreeModel) SetPwd(fqfp string) error {
 	return nil
 }
 
+func (tree *FileTreeModel) GetPwd() string {
+	return tree.pwd.AbsPath()
+}
+
 func (tree *FileTreeModel) sortedNamesInPwd() []string {
 	var keys []string
 
@@ -218,9 +222,9 @@ func (tree *FileTreeModel) AddPath(fqfp string, info FileInfo) (*FileNode, []*Fi
 			if idx == len(nodeNames)-1 {
 				// this is the actual child that was intended to be added
 				node = node.AddChild(name, info)
- 			} else {
- 				// this is an intermediary node in the absolute path
- 				// for instance: /a/b/intermediary/the_child
+			} else {
+				// this is an intermediary node in the absolute path
+				// for instance: /a/b/intermediary/the_child
 				osFileInfo, err := os.Stat(currentFqfp)
 				fileInfo := NewFileInfo(currentFqfp, osFileInfo, err)
 				node = node.AddChild(name, fileInfo)

@@ -212,8 +212,10 @@ func (app *Application) ToggleActiveFilePanel() (err error) {
 	v := app.gui.CurrentView()
 	if v == nil || v.Name() == app.AlphaTree.Name() {
 		app.activeFilePanel = app.BetaTree
+		app.BottomRow.SetFilePanels(app.BetaTree, app.AlphaTree)
 	} else {
 		app.activeFilePanel = app.AlphaTree
+		app.BottomRow.SetFilePanels(app.AlphaTree, app.BetaTree)
 	}
 
 	app.Status.SetCurrentView(app.activeFilePanel)

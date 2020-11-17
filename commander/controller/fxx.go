@@ -5,6 +5,8 @@ import (
 	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/utils"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/jroimartin/gocui"
@@ -15,6 +17,9 @@ type FxxController struct {
 	name string
 	gui  *gocui.Gui
 	view *gocui.View
+
+	sourceFileTree *FileTreeController
+	targetFileTree *FileTreeController
 
 	requestedHeight int
 
@@ -38,8 +43,10 @@ func (c *FxxController) Name() string {
 	return c.name
 }
 
-func (c *FxxController) AddKeymap(keys ...KeymapDetail) {
-	c.keymaps = append(c.keymaps, keys...)
+// SetFilePanels sets active and inactive File Panels
+func (c *FxxController) SetFilePanels(activeFilePanel, targetFilePanel *FileTreeController) {
+	c.sourceFileTree = activeFilePanel
+	c.targetFileTree = targetFilePanel
 }
 
 // Setup initializes the UI concerns within the context of a global [gocui] controller object.
@@ -70,22 +77,22 @@ func (c *FxxController) Setup(view *gocui.View) error {
 		},
 		{
 			KeyboardShortcut: "F5",
-			OnAction:         c.dummy,
+			OnAction:         c.F5,
 			Display:          "Clone",
 		},
 		{
 			KeyboardShortcut: "F6",
-			OnAction:         c.dummy,
+			OnAction:         c.F6,
 			Display:          "Move",
 		},
 		{
 			KeyboardShortcut: "F7",
-			OnAction:         c.dummy,
+			OnAction:         c.F7,
 			Display:          "MkDir",
 		},
 		{
 			KeyboardShortcut: "F8",
-			OnAction:         c.dummy,
+			OnAction:         c.F8,
 			Display:          "Delete",
 		},
 		{
@@ -188,5 +195,54 @@ func (c *FxxController) exit() error {
 }
 
 func (c *FxxController) dummy() error {
+	return nil
+}
+
+func (c *FxxController) F5() error {
+	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
+	targetFolder := c.targetFileTree.ftv.ModelTree.GetPwd()
+	targetFileName := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
+
+	input, err := ioutil.ReadFile(sourceFileNode.AbsPath())
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(targetFileName, input, sourceFileNode.Data.FileInfo.Mode)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *FxxController) F6() error {
+	err := c.F5()
+	if err != nil {
+		return err
+	}
+
+	err = c.F8()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *FxxController) F7() error {
+	// TODO: add panel popup
+	err := os.Mkdir("subdir", 0755)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *FxxController) F8() error {
+	// TODO: add panel popup
+	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
+	err := os.Remove(sourceFileNode.AbsPath())
+	if err != nil {
+		return err
+	}
 	return nil
 }
