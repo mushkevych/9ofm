@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 	"github.com/mushkevych/9ofm/commander/format"
+	"github.com/mushkevych/9ofm/commander/model"
+	"github.com/mushkevych/9ofm/commander/view"
 	"github.com/mushkevych/9ofm/utils"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -198,7 +200,30 @@ func (c *FxxController) dummy() error {
 	return nil
 }
 
+func (c *FxxController) refreshFilePanel(ftc *FileTreeController) error {
+	if ftc == nil{
+		return nil
+	}
+
+	fileTree, err := model.ReadFileTree(ftc.ftv.ModelTree.GetPwd())
+	if err != nil {
+		return err
+	}
+
+	ftc.ftv, err = view.NewFileTreeView(fileTree)
+	if err != nil {
+		return err
+	}
+
+	_ = ftc.Update()
+	return ftc.Render()
+}
+
 func (c *FxxController) F5() error {
+	if c.sourceFileTree == nil || c.targetFileTree == nil {
+		return nil
+	}
+
 	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
 	targetFolder := c.targetFileTree.ftv.ModelTree.GetPwd()
 	targetFileName := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
@@ -212,10 +237,20 @@ func (c *FxxController) F5() error {
 	if err != nil {
 		return err
 	}
+
+	err = c.refreshFilePanel(c.targetFileTree)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *FxxController) F6() error {
+	if c.sourceFileTree == nil || c.targetFileTree == nil {
+		return nil
+	}
+
 	err := c.F5()
 	if err != nil {
 		return err
@@ -225,22 +260,52 @@ func (c *FxxController) F6() error {
 	if err != nil {
 		return err
 	}
+
+	err = c.refreshFilePanel(c.sourceFileTree)
+	if err != nil {
+		return err
+	}
+
+	err = c.refreshFilePanel(c.targetFileTree)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *FxxController) F7() error {
+	if c.sourceFileTree == nil || c.targetFileTree == nil {
+		return nil
+	}
+
 	// TODO: add panel popup
 	err := os.Mkdir("subdir", 0755)
 	if err != nil {
 		return err
 	}
+
+	err = c.refreshFilePanel(c.sourceFileTree)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *FxxController) F8() error {
+	if c.sourceFileTree == nil || c.targetFileTree == nil {
+		return nil
+	}
+
 	// TODO: add panel popup
 	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
 	err := os.Remove(sourceFileNode.AbsPath())
+	if err != nil {
+		return err
+	}
+
+	err = c.refreshFilePanel(c.sourceFileTree)
 	if err != nil {
 		return err
 	}
