@@ -29,7 +29,7 @@ func init() {
 		Add("log.level", log.InfoLevel.String()).
 		Add("log.path", "./9ofm.log").
 		Add("debug", "false").
-		Add("log.enabled", "false").
+		Add("log.enabled", "true").
 
 		Add("diff.hide", "Modified,Added,Removed").
 

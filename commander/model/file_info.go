@@ -33,11 +33,22 @@ func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
 
 	UID := -1
 	GID := -1
-	fileStats, err := os.Stat(fqfp)
-	if err != nil {
-		log.Panicf(fmt.Sprintf("could not retrieve os.Stats: '%s' (path: '%s')", err, fqfp))
+	var stat *syscall.Stat_t
+	var ok bool
+	if fileStats, err := os.Stat(fqfp); err == nil {
+		stat, ok = fileStats.Sys().(*syscall.Stat_t)
+	} else {
+		if !os.IsNotExist(err) {
+			// file exist and this must be something nasty
+			log.Panicf(fmt.Sprintf("could not retrieve os.Stats: '%s' (path: '%s')", err, fqfp))
+		} else {
+			// this is likely a broken symlink
+			log.Warningf(fmt.Sprintf("retrieving os.Stats from os.FileInfo due to: '%s' (path: '%s')", err, fqfp))
+			stat, ok = info.Sys().(*syscall.Stat_t)
+		}
 	}
-	if stat, ok := fileStats.Sys().(*syscall.Stat_t); ok {
+
+	if ok && stat != nil {
 		UID = int(stat.Uid)
 		GID = int(stat.Gid)
 	}

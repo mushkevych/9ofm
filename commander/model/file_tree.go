@@ -89,7 +89,7 @@ func (tree *FileTreeModel) GetNodeAt(index int) *FileNode {
 		return tree.pwd.Parent
 	} else {
 		childKey := keys[index]
-		return tree.Root.Children[childKey]
+		return tree.pwd.Children[childKey]
 	}
 }
 
@@ -110,7 +110,7 @@ func (tree *FileTreeModel) VisibleSize() int {
 		// +1 includes ".." parent reference
 		return len(tree.pwd.Children) + 1
 	} else {
-		return len(tree.Root.Children)
+		return len(tree.pwd.Children)
 	}
 }
 
@@ -156,7 +156,7 @@ func (tree *FileTreeModel) Clone() *FileTreeModel {
 	newTree := NewFileTreeModel()
 	newTree.Size = tree.Size
 	newTree.Root = tree.Root.Copy(newTree.Root)
-	newTree.SetPwd(tree.pwd.fqfp)
+	_ = newTree.SetPwd(tree.pwd.fqfp)
 
 	// update the tree pointers
 	err := newTree.DepthFirstSearch(func(node *FileNode) error {

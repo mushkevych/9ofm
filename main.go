@@ -52,7 +52,7 @@ func initLogging() {
 	}
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 
 	Formatter := new(log.TextFormatter)
