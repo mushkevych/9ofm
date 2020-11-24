@@ -5,14 +5,14 @@ import (
 	"github.com/mushkevych/9ofm/commander/layout"
 	"regexp"
 
-	"github.com/jroimartin/gocui"
 	"github.com/mushkevych/9ofm/commander/controller"
 	"github.com/mushkevych/9ofm/commander/model"
+	"github.com/rivo/tview"
 	log "github.com/sirupsen/logrus"
 )
 
 type Application struct {
-	gui             *gocui.Gui
+	tviewApp     *tview.Application
 	AlphaTree       *controller.FileTreeController
 	BetaTree        *controller.FileTreeController
 	activeFilePanel *controller.FileTreeController
@@ -33,8 +33,8 @@ func (app *Application) Renderers() []controller.Renderer {
 	}
 }
 
-func NewApplication(gui *gocui.Gui) (*Application, error) {
-	application, err := buildControllers(gui)
+func NewApplication(tviewApp *tview.Application) (*Application, error) {
+	application, err := buildControllers(tviewApp)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func NewApplication(gui *gocui.Gui) (*Application, error) {
 	return application, nil
 }
 
-func buildControllers(gui *gocui.Gui) (*Application, error) {
+func buildControllers(app *tview.Application) (*Application, error) {
 	alphaFileTree, err := model.ReadFileTree("/")
 	if err != nil {
 		return nil, err
@@ -118,13 +118,13 @@ func (app *Application) registerGlobalKeymaps() error {
 			KeyboardShortcut: "Ctrl+f",
 			OnAction:         app.ShowFilterView,
 			//IsSelected:       app.Filter.IsVisible,
-			Display:          "Filter",
+			Display: "Filter",
 		},
 		{
 			KeyboardShortcut: "Esc",
 			OnAction:         app.HideFilterView,
 			//IsSelected:       app.Filter.IsVisible,
-			Display:          "Filter",
+			Display: "Filter",
 		},
 	}
 

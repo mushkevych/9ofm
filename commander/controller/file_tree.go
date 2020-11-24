@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"github.com/mushkevych/9ofm/commander/configuration"
+	"github.com/rivo/tview"
 	"regexp"
 
 	"github.com/jroimartin/gocui"
@@ -18,7 +19,7 @@ type ViewOptionChangeListener func() error
 // FileTreeController holds the UI objects and data models for populating the File Tree Pane.
 type FileTreeController struct {
 	name   string
-	gui    *gocui.Gui
+	app *tview.Application
 	view   *gocui.View
 	header *gocui.View
 	ftv    *view.FileTreeView
@@ -31,13 +32,13 @@ type FileTreeController struct {
 }
 
 // NewFileTreeController creates a new FileTreeController object attached the the global [gocui] screen object.
-func NewFileTreeController(gui *gocui.Gui, name string, fileTree *model.FileTreeModel) (controller *FileTreeController, err error) {
+func NewFileTreeController(app *tview.Application, name string, fileTree *model.FileTreeModel) (controller *FileTreeController, err error) {
 	controller = new(FileTreeController)
 	controller.listeners = make([]ViewOptionChangeListener, 0)
 
 	// populate main fields
 	controller.name = name
-	controller.gui = gui
+	controller.app = app
 	controller.ftv, err = view.NewFileTreeView(fileTree)
 	if err != nil {
 		return nil, err
