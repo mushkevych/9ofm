@@ -1,42 +1,77 @@
 package controller
 
 import (
-	"fmt"
-	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/commander/model"
 	"github.com/mushkevych/9ofm/commander/view"
-	"github.com/mushkevych/9ofm/utils"
+	"github.com/rivo/tview"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
-	"strings"
-
-	"github.com/jroimartin/gocui"
 )
 
 // FxxController defines the bottom UI row with F1-F12 functional keys, and related properties and functions
 type FxxController struct {
-	name string
-	gui  *gocui.Gui
-	view *gocui.View
+	tviewApp       *tview.Application
+	name           string
+	graphicElement GraphicElement
 
 	sourceFileTree *FileTreeController
 	targetFileTree *FileTreeController
-
-	requestedHeight int
-
-	keymaps []KeymapDetail
 }
 
 // NewFxxController creates a new controller object attached the the global [gocui] screen object.
-func NewFxxController(gui *gocui.Gui) (controller *FxxController) {
+func NewFxxController(tviewApp *tview.Application) (controller *FxxController) {
 	controller = new(FxxController)
 
 	// populate main fields
+	controller.tviewApp = tviewApp
 	controller.name = "bottom_row"
-	controller.gui = gui
-	controller.keymaps = make([]KeymapDetail, 0)
-	controller.requestedHeight = 1
+
+	// create tview graphicElement
+	buttonHeight := 1 // number of rows
+	buttonWidth := 10 // number of chars
+
+	buttonF1 := tview.NewButton("F1: HELP").SetSelectedFunc(nil)
+	buttonF1.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF2 := tview.NewButton("F2: RENAME").SetSelectedFunc(nil)
+	buttonF2.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF3 := tview.NewButton("F3: VIEW").SetSelectedFunc(nil)
+	buttonF3.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF4 := tview.NewButton("F4: EDIT").SetSelectedFunc(nil)
+	buttonF4.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF5 := tview.NewButton("F5: COPY").SetSelectedFunc(func() { _ = controller.F5 })
+	buttonF5.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF6 := tview.NewButton("F6: HELP").SetSelectedFunc(func() { _ = controller.F6 })
+	buttonF6.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF7 := tview.NewButton("F7: MKDIR").SetSelectedFunc(func() { _ = controller.F7 })
+	buttonF7.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF8 := tview.NewButton("F8: RM").SetSelectedFunc(func() { _ = controller.F8 })
+	buttonF8.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF9 := tview.NewButton("F9: TERM").SetSelectedFunc(nil)
+	buttonF9.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	buttonF10 := tview.NewButton("F10: EXIT").SetSelectedFunc(func() { _ = controller.F10 })
+	buttonF10.SetBorder(true).SetRect(0, 0, buttonWidth, buttonHeight)
+
+	controller.graphicElement = tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(buttonF1, 1, 1, false).
+		AddItem(buttonF2, 1, 1, false).
+		AddItem(buttonF3, 1, 1, false).
+		AddItem(buttonF4, 1, 1, false).
+		AddItem(buttonF5, 1, 1, false).
+		AddItem(buttonF6, 1, 1, false).
+		AddItem(buttonF7, 1, 1, false).
+		AddItem(buttonF8, 1, 1, false).
+		AddItem(buttonF9, 1, 1, false).
+		AddItem(buttonF10, 1, 1, false)
 
 	return controller
 }
@@ -51,86 +86,6 @@ func (c *FxxController) SetFilePanels(activeFilePanel, targetFilePanel *FileTree
 	c.targetFileTree = targetFilePanel
 }
 
-// Setup initializes the UI concerns within the context of a global [gocui] controller object.
-func (c *FxxController) Setup(view *gocui.View) error {
-	log.Tracef("controller.Setup() %s", c.Name())
-
-	// set controller options
-	c.view = view
-	c.view.Editable = false
-	c.view.Wrap = false
-	c.view.Frame = true
-
-	var keymaps = []KeymapDetail{
-		{
-			KeyboardShortcut: "F2",
-			OnAction:         c.dummy,
-			Display:          "Rename",
-		},
-		{
-			KeyboardShortcut: "F3",
-			OnAction:         c.dummy,
-			Display:          "View",
-		},
-		{
-			KeyboardShortcut: "F4",
-			OnAction:         c.dummy,
-			Display:          "View",
-		},
-		{
-			KeyboardShortcut: "F5",
-			OnAction:         c.F5,
-			Display:          "Clone",
-		},
-		{
-			KeyboardShortcut: "F6",
-			OnAction:         c.F6,
-			Display:          "Move",
-		},
-		{
-			KeyboardShortcut: "F7",
-			OnAction:         c.F7,
-			Display:          "MkDir",
-		},
-		{
-			KeyboardShortcut: "F8",
-			OnAction:         c.F8,
-			Display:          "Delete",
-		},
-		{
-			KeyboardShortcut: "F9",
-			OnAction:         c.dummy,
-			Display:          "Term",
-		},
-		{
-			KeyboardShortcut: "Ctrl+q",
-			OnAction:         c.exit,
-		},
-		{
-			KeyboardShortcut: "F10",
-			OnAction:         c.exit,
-			Display:          "Exit",
-		},
-	}
-
-	// NOTE: viewname="" makes the keymapping global
-	err := RegisterKeymaps(c.gui, "", keymaps)
-	if err != nil {
-		return err
-	}
-	c.keymaps = keymaps
-	return c.Render()
-}
-
-// OnLayoutChange is called whenever the screen dimensions are changed
-func (c *FxxController) OnLayoutChange() error {
-	err := c.Update()
-	if err != nil {
-		return err
-	}
-	return c.Render()
-}
-
 // Update refreshes the state objects for future rendering (currently does nothing).
 func (c *FxxController) Update() error {
 	return nil
@@ -140,16 +95,6 @@ func (c *FxxController) Update() error {
 func (c *FxxController) Render() error {
 	log.Tracef("controller.Render() %s", c.Name())
 
-	c.gui.Update(func(g *gocui.Gui) error {
-		c.view.Clear()
-
-		_, err := fmt.Fprintln(c.view, c.Keymap()+format.StatusNormal("▏"+strings.Repeat(" ", 1000)))
-		if err != nil {
-			log.Debug("unable to write to buffer: ", err)
-		}
-
-		return err
-	})
 	return nil
 }
 
@@ -158,42 +103,21 @@ func (c *FxxController) IsVisible() bool {
 	return c != nil
 }
 
-// SetVisible is not used for Functional Key Row
+// SetVisible is not used for Functional Rune Row
 func (c *FxxController) SetVisible(visible bool) error {
 	return nil
 }
 
-// Keymap indicates all the possible global keyboard actions a user can take when any pane is selected.
-func (c *FxxController) Keymap() string {
-	var keymaps string
-	for _, keymap := range c.keymaps {
-		keymaps += keymap.String()
-	}
-	return keymaps
-}
-
-func (c *FxxController) Layout(g *gocui.Gui, minX, minY, maxX, maxY int) error {
-	log.Tracef("controller.Layout(minX: %d, minY: %d, maxX: %d, maxY: %d) %s", minX, minY, maxX, maxY, c.Name())
-
-	view, viewErr := g.SetView(c.Name(), minX, minY, maxX, maxY)
-	if utils.IsNewView(viewErr) {
-		err := c.Setup(view)
-		if err != nil {
-			log.Error("unable to setup status controller", err)
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *FxxController) RequestedSize(available int) *int {
-	return &c.requestedHeight
+// GetPrimitive returns graphicElement used by tview framework to render the UI interface
+func (c *FxxController) GraphicElement() GraphicElement {
+	return c.graphicElement
 }
 
 // *** F1-F12 Functions ***
-// quit is the gocui callback invoked when the user hits Ctrl+C
+// quit is the tview callback invoked when the user hits Ctrl+C
 func (c *FxxController) exit() error {
-	return gocui.ErrQuit
+	c.tviewApp.Stop()
+	return nil
 }
 
 func (c *FxxController) dummy() error {
@@ -201,7 +125,7 @@ func (c *FxxController) dummy() error {
 }
 
 func (c *FxxController) refreshFilePanel(ftc *FileTreeController) error {
-	if ftc == nil{
+	if ftc == nil {
 		return nil
 	}
 
@@ -215,7 +139,6 @@ func (c *FxxController) refreshFilePanel(ftc *FileTreeController) error {
 		return err
 	}
 
-	_ = ftc.Update()
 	return ftc.Render()
 }
 
@@ -309,5 +232,21 @@ func (c *FxxController) F8() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (c *FxxController) F10() error {
+	modalWindow := tview.NewModal().
+		SetText("Do you want to quit the application?").
+		AddButtons([]string{"Quit", "Cancel"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonLabel == "Quit" {
+				_ = c.exit()
+			}
+		})
+
+	// Display and focus the dialog
+	c.tviewApp.SetRoot(modalWindow, false)
+
 	return nil
 }

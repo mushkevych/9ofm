@@ -90,7 +90,7 @@ func Run() error {
 		}
 
 		// perform the first update and render now that all resources have been loaded
-		err = application.UpdateAndRender()
+		err = application.Render()
 		if err != nil {
 			return
 		}

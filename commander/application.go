@@ -1,8 +1,7 @@
 package commander
 
 import (
-	"github.com/mushkevych/9ofm/commander/configuration"
-	"github.com/mushkevych/9ofm/commander/layout"
+	"github.com/gdamore/tcell/v2"
 	"regexp"
 
 	"github.com/mushkevych/9ofm/commander/controller"
@@ -12,22 +11,19 @@ import (
 )
 
 type Application struct {
-	tviewApp     *tview.Application
+	tviewApp        *tview.Application
 	AlphaTree       *controller.FileTreeController
 	BetaTree        *controller.FileTreeController
 	activeFilePanel *controller.FileTreeController
-	Status          *controller.StatusController
 	BottomRow       *controller.FxxController
 	Filter          *controller.FilterController
-	Debug           *controller.DebugController
-	LayoutManager   *layout.Manager
+	LayoutManager   *LayoutManager
 }
 
 func (app *Application) Renderers() []controller.Renderer {
 	return []controller.Renderer{
 		app.AlphaTree,
 		app.BetaTree,
-		app.Status,
 		app.BottomRow,
 		app.Filter,
 	}
@@ -38,7 +34,7 @@ func NewApplication(tviewApp *tview.Application) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	application, err = buildLayout(application)
+	application, err = buildLayout(tviewApp, application)
 	if err != nil {
 		return nil, err
 	}
@@ -49,12 +45,12 @@ func NewApplication(tviewApp *tview.Application) (*Application, error) {
 	return application, nil
 }
 
-func buildControllers(app *tview.Application) (*Application, error) {
+func buildControllers(tviewApp *tview.Application) (*Application, error) {
 	alphaFileTree, err := model.ReadFileTree("/")
 	if err != nil {
 		return nil, err
 	}
-	AlphaTree, err := controller.NewFileTreeController(gui, "alphaFileTree", alphaFileTree)
+	AlphaTree, err := controller.NewFileTreeController(tviewApp, "alphaFileTree", alphaFileTree)
 	if err != nil {
 		return nil, err
 	}
@@ -63,86 +59,60 @@ func buildControllers(app *tview.Application) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	BetaTree, err := controller.NewFileTreeController(gui, "betaFileTree", betaFileTree)
+	BetaTree, err := controller.NewFileTreeController(tviewApp, "betaFileTree", betaFileTree)
 	if err != nil {
 		return nil, err
 	}
 
 	application := &Application{
-		gui:             gui,
+		tviewApp:        tviewApp,
 		AlphaTree:       AlphaTree,
 		BetaTree:        BetaTree,
 		activeFilePanel: AlphaTree,
-		Status:          controller.NewStatusController(gui),
-		BottomRow:       controller.NewFxxController(gui),
-		Filter:          controller.NewFilterController(gui),
-		Debug:           controller.NewDebugController(gui),
+		BottomRow:       controller.NewFxxController(tviewApp),
+		//Filter:          controller.NewFilterController(tviewApp),
 	}
 
+	// TODO: see if this can be removed, as well as AddOnChangeListener & onChangeListener
 	// update the status pane when a model option is changed by the user
-	application.AlphaTree.AddViewOptionChangeListener(application.onFileTreeViewOptionChange)
-	application.BetaTree.AddViewOptionChangeListener(application.onFileTreeViewOptionChange)
-
+	//application.AlphaTree.AddOnChangeListener(application.onChangeListener)
+	//application.BetaTree.AddOnChangeListener(application.onChangeListener)
+	//
 	// update the tree application while the user types into the filter application
-	application.Filter.AddFilterEditListener(application.onFilterEdit)
+	//application.Filter.AddFilterEditListener(application.onFilterEdit)
 
 	return application, nil
 }
 
-func buildLayout(application *Application) (*Application, error) {
-	application.LayoutManager = layout.NewManager()
-	application.LayoutManager.Add(application.BottomRow, layout.LocationFooter)
-	application.LayoutManager.Add(application.Status, layout.LocationFooter)
-	application.LayoutManager.Add(application.Filter, layout.LocationFooter)
-	application.LayoutManager.Add(application.BetaTree, layout.LocationColumn)
-	application.LayoutManager.Add(application.AlphaTree, layout.LocationColumn)
-
-	if configuration.Config.GetBoolOrDefault("debug", false) {
-		application.LayoutManager.Add(application.Debug, layout.LocationColumn)
-	}
-	application.gui.Cursor = false
-	//application.gui.Mouse = true
-	application.gui.SetManagerFunc(application.LayoutManager.Layout)
+func buildLayout(tviewApp *tview.Application, application *Application) (*Application, error) {
+	application.LayoutManager = NewManager(tviewApp, application)
+	application.LayoutManager.BuildLayout()
 
 	return application, nil
 }
 
 func (app *Application) registerGlobalKeymaps() error {
-	var keymaps = []controller.KeymapDetail{
-		{
-			KeyboardShortcut: "Tab",
-			OnAction:         app.ToggleActiveFilePanel,
-			Display:          "Switch panes",
-		},
-		{
-			KeyboardShortcut: "Ctrl+f",
-			OnAction:         app.ShowFilterView,
-			//IsSelected:       app.Filter.IsVisible,
-			Display: "Filter",
-		},
-		{
-			KeyboardShortcut: "Esc",
-			OnAction:         app.HideFilterView,
-			//IsSelected:       app.Filter.IsVisible,
-			Display: "Filter",
-		},
-	}
+	app.tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		var err error
+		switch event.Key() {
+		case tcell.KeyTab:
+			err = app.ToggleActiveFilePanel()
+		case tcell.KeyCtrlF:
+			err = app.ShowFilterView()
+		case tcell.KeyESC:
+			err = app.HideFilterView()
+		}
 
-	err := controller.RegisterKeymaps(app.gui, "", keymaps)
-	if err != nil {
-		return err
-	}
-
-	app.Status.AddKeymap(keymaps...)
+		if err != nil {
+			log.WithError(err)
+		}
+		return event
+	})
 	return nil
 }
 
-func (app *Application) onFileTreeViewOptionChange() error {
-	err := app.Status.Update()
-	if err != nil {
-		return err
-	}
-	return app.Status.Render()
+func (app *Application) onChangeListener() error {
+	return nil
 }
 
 func (app *Application) onFilterEdit(filter string) error {
@@ -157,41 +127,7 @@ func (app *Application) onFilterEdit(filter string) error {
 	}
 
 	app.activeFilePanel.SetFilterRegex(filterRegex)
-
-	err = app.activeFilePanel.Update()
-	if err != nil {
-		return err
-	}
-
 	return app.activeFilePanel.Render()
-}
-
-func (app *Application) UpdateAndRender() error {
-	err := app.Update()
-	if err != nil {
-		log.Debug("failed update: ", err)
-		return err
-	}
-
-	err = app.Render()
-	if err != nil {
-		log.Debug("failed render: ", err)
-		return err
-	}
-
-	return nil
-}
-
-// Update refreshes the state objects for future rendering.
-func (app *Application) Update() error {
-	for _, renderer := range app.Renderers() {
-		err := renderer.Update()
-		if err != nil {
-			log.Debug("unable to update appController: ")
-			return err
-		}
-	}
-	return nil
 }
 
 // Render flushes the state objects to the screen.
@@ -209,8 +145,8 @@ func (app *Application) Render() error {
 
 // ToggleActiveFilePanel switches between the two file panels
 func (app *Application) ToggleActiveFilePanel() (err error) {
-	v := app.gui.CurrentView()
-	if v == nil || v.Name() == app.AlphaTree.Name() {
+	v := app.tviewApp.GetFocus()
+	if v == nil || v == app.AlphaTree.GraphicElement() {
 		app.activeFilePanel = app.BetaTree
 		app.BottomRow.SetFilePanels(app.BetaTree, app.AlphaTree)
 	} else {
@@ -218,13 +154,7 @@ func (app *Application) ToggleActiveFilePanel() (err error) {
 		app.BottomRow.SetFilePanels(app.AlphaTree, app.BetaTree)
 	}
 
-	app.Status.SetCurrentView(app.activeFilePanel)
-	_, err = app.gui.SetCurrentView(app.activeFilePanel.Name())
-	if err != nil {
-		log.Error("unable to select Pane: ", app.activeFilePanel.Name())
-		return err
-	}
-	return app.UpdateAndRender()
+	return app.Render()
 }
 
 // HideFilterView hides the FilePanel filter UI components
@@ -246,7 +176,7 @@ func (app *Application) HideFilterView() error {
 		return err
 	}
 
-	return app.UpdateAndRender()
+	return app.Render()
 }
 
 // HideFilterView shows the FilePanel filter UI components
@@ -257,5 +187,5 @@ func (app *Application) ShowFilterView() error {
 		log.Error("unable to show Filter: ", err)
 		return err
 	}
-	return app.UpdateAndRender()
+	return app.Render()
 }

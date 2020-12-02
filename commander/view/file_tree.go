@@ -239,7 +239,7 @@ func (v *FileTreeView) Update(filterRegex *regexp.Regexp, width, height int) err
 	return nil
 }
 
-// Render flushes the state objects (file tree) to the pane.
+// Render flushes the file tree to the `Buffer`, which is later used by the controller
 func (v *FileTreeView) Render() error {
 	treeString := v.ModelTree.StringBetween(v.bufferIndexLowerBound, v.bufferIndexUpperBound(), v.ShowFileAttributes)
 	lines := strings.Split(treeString, "\n")

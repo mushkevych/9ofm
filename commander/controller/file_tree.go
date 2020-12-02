@@ -1,16 +1,15 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
-	"github.com/mushkevych/9ofm/commander/configuration"
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"regexp"
+	"strings"
 
-	"github.com/jroimartin/gocui"
-	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/commander/model"
 	"github.com/mushkevych/9ofm/commander/view"
-	"github.com/mushkevych/9ofm/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,48 +17,51 @@ type ViewOptionChangeListener func() error
 
 // FileTreeController holds the UI objects and data models for populating the File Tree Pane.
 type FileTreeController struct {
-	name   string
-	app *tview.Application
-	view   *gocui.View
-	header *gocui.View
-	ftv    *view.FileTreeView
-	title  string
+	tviewApp       *tview.Application
+	name           string
+	graphicElement GraphicElement
+	ftv            *view.FileTreeView
 
-	filterRegex         *regexp.Regexp
-	listeners           []ViewOptionChangeListener
-	keymaps             []KeymapDetail
-	requestedWidthRatio float64
+	filterRegex *regexp.Regexp
+	listeners   []ViewOptionChangeListener
 }
 
-// NewFileTreeController creates a new FileTreeController object attached the the global [gocui] screen object.
-func NewFileTreeController(app *tview.Application, name string, fileTree *model.FileTreeModel) (controller *FileTreeController, err error) {
+// NewFileTreeController creates a new FileTreeController object attached the the global [tview] screen object.
+func NewFileTreeController(tviewApp *tview.Application, name string, fileTree *model.FileTreeModel) (controller *FileTreeController, err error) {
 	controller = new(FileTreeController)
 	controller.listeners = make([]ViewOptionChangeListener, 0)
 
 	// populate main fields
 	controller.name = name
-	controller.app = app
 	controller.ftv, err = view.NewFileTreeView(fileTree)
 	if err != nil {
 		return nil, err
 	}
 
-	requestedWidthRatio := configuration.Config.GetFloat64("filetree.pane-width")
-	if requestedWidthRatio >= 1 || requestedWidthRatio <= 0 {
-		log.Errorf("invalid config value: 'filetree.pane-width' should be 0 < value < 1, given '%v'", requestedWidthRatio)
-		requestedWidthRatio = 0.5
-	}
-	controller.requestedWidthRatio = requestedWidthRatio
+	controller.graphicElement = tview.NewList()
+	controller.graphicElement.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		var err error
+		switch event.Key() {
+		case tcell.KeyEnter:
+			err = controller.navigateTo()
+		case tcell.KeyCtrlA:
+			err = controller.toggleShowDiffType(model.Added)
+		case tcell.KeyCtrlR:
+			err = controller.toggleShowDiffType(model.Removed)
+		case tcell.KeyCtrlO:
+			err = controller.toggleShowDiffType(model.Modified)
+		case tcell.KeyCtrlU:
+			err = controller.toggleShowDiffType(model.Unmodified)
+		case tcell.KeyCtrlB:
+			err = controller.toggleAttributes()
+		}
 
+		if err != nil {
+			log.WithError(err)
+		}
+		return event
+	})
 	return controller, err
-}
-
-func (c *FileTreeController) AddViewOptionChangeListener(listener ...ViewOptionChangeListener) {
-	c.listeners = append(c.listeners, listener...)
-}
-
-func (c *FileTreeController) SetTitle(title string) {
-	c.title = title
 }
 
 func (c *FileTreeController) SetFilterRegex(filterRegex *regexp.Regexp) {
@@ -68,135 +70,6 @@ func (c *FileTreeController) SetFilterRegex(filterRegex *regexp.Regexp) {
 
 func (c *FileTreeController) Name() string {
 	return c.name
-}
-
-// Setup initializes the UI concerns within the context of a global [gocui] view object.
-func (c *FileTreeController) Setup(view *gocui.View, header *gocui.View) error {
-	log.Tracef("controller.Setup() %s", c.Name())
-
-	// set controller options
-	c.view = view
-	c.view.Editable = false
-	c.view.Wrap = false
-	c.view.Frame = false
-
-	c.header = header
-	c.header.Editable = false
-	c.header.Wrap = false
-	c.header.Frame = false
-
-	var keymaps = []KeymapDetail{
-		{
-			KeyboardShortcut: "Enter",
-			OnAction:         c.navigateTo,
-			Display:          "Go to",
-		},
-		{
-			KeyboardShortcut: "Ctrl+a",
-			OnAction:         func() error { return c.toggleShowDiffType(model.Added) },
-			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Added] },
-			Display:          "Added",
-		},
-		{
-			KeyboardShortcut: "Ctrl+r",
-			OnAction:         func() error { return c.toggleShowDiffType(model.Removed) },
-			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Removed] },
-			Display:          "Removed",
-		},
-		{
-			KeyboardShortcut: "Ctrl+m",
-			OnAction:         func() error { return c.toggleShowDiffType(model.Modified) },
-			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Modified] },
-			Display:          "Modified",
-		},
-		{
-			KeyboardShortcut: "Ctrl+u",
-			OnAction:         func() error { return c.toggleShowDiffType(model.Unmodified) },
-			IsSelected:       func() bool { return !c.ftv.HiddenDiffTypes[model.Unmodified] },
-			Display:          "Unmodified",
-		},
-		{
-			KeyboardShortcut: "Ctrl+b",
-			OnAction:         c.toggleAttributes,
-			IsSelected:       func() bool { return c.ftv.ShowFileAttributes },
-			Display:          "Attributes",
-		},
-		{
-			KeyboardShortcut: "Pgup",
-			OnAction:         c.PageUp,
-		},
-		{
-			KeyboardShortcut: "Pgdn",
-			OnAction:         c.PageDown,
-		},
-		{
-			KeyboardShortcut: "Down",
-			OnAction:         c.CursorDown,
-		},
-		{
-			KeyboardShortcut: "Up",
-			OnAction:         c.CursorUp,
-		},
-	}
-
-	err := RegisterKeymaps(c.gui, c.name, keymaps)
-	if err != nil {
-		return err
-	}
-	c.keymaps = keymaps
-
-	_, height := c.view.Size()
-	c.ftv.Setup(0, height)
-	_ = c.Update()
-	_ = c.Render()
-
-	return nil
-}
-
-// resetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
-func (c *FileTreeController) resetCursor() {
-	_ = c.view.SetCursor(0, 0)
-	c.ftv.ResetCursor()
-}
-
-// CursorDown moves the cursor down and renders the controller.
-// Note: we cannot use the gocui buffer since any state change requires writing the entire tree to the buffer.
-// Instead we are keeping an upper and lower bounds of the tree string to render and only flushing
-// this range into the controller buffer. This is much faster when tree sizes are large.
-func (c *FileTreeController) CursorDown() error {
-	if c.ftv.CursorDown() {
-		return c.Render()
-	}
-	return nil
-}
-
-// CursorUp moves the cursor up and renders the controller.
-// Note: we cannot use the gocui buffer since any state change requires writing the entire tree to the buffer.
-// Instead we are keeping an upper and lower bounds of the tree string to render and only flushing
-// this range into the controller buffer. This is much faster when tree sizes are large.
-func (c *FileTreeController) CursorUp() error {
-	if c.ftv.CursorUp() {
-		return c.Render()
-	}
-	return nil
-}
-
-// PageDown moves to next page putting the cursor on top
-func (c *FileTreeController) PageDown() error {
-	err := c.ftv.PageDown()
-	if err != nil {
-		return err
-	}
-	return c.Render()
-}
-
-// PageUp moves to previous page putting the cursor on top
-func (c *FileTreeController) PageUp() error {
-	err := c.ftv.PageUp()
-	if err != nil {
-		return err
-	}
-	return c.Render()
 }
 
 // navigateTo will enter the directory
@@ -215,7 +88,6 @@ func (c *FileTreeController) navigateTo() error {
 		}
 	}
 
-	_ = c.Update()
 	return c.Render()
 }
 
@@ -237,10 +109,6 @@ func (c *FileTreeController) toggleAttributes() error {
 		return err
 	}
 
-	err = c.Update()
-	if err != nil {
-		return err
-	}
 	err = c.Render()
 	if err != nil {
 		return err
@@ -254,11 +122,7 @@ func (c *FileTreeController) toggleAttributes() error {
 func (c *FileTreeController) toggleShowDiffType(diffType model.DiffType) error {
 	c.ftv.ToggleShowDiffType(diffType)
 
-	err := c.Update()
-	if err != nil {
-		return err
-	}
-	err = c.Render()
+	err := c.Render()
 	if err != nil {
 		return err
 	}
@@ -267,52 +131,30 @@ func (c *FileTreeController) toggleShowDiffType(diffType model.DiffType) error {
 	return c.notifyOnViewOptionChangeListeners()
 }
 
-// Update refreshes the state objects for future rendering.
-func (c *FileTreeController) Update() error {
-	var width, height int
-
-	if c.view != nil {
-		width, height = c.view.Size()
-	} else {
-		// before the TUI is setup there may not be a controller to reference. Use the entire screen as reference.
-		width, height = c.gui.Size()
-	}
-	// height should account for the header
-	return c.ftv.Update(c.filterRegex, width, height-1)
-}
-
 // Render flushes the state objects (file tree) to the pane.
 func (c *FileTreeController) Render() error {
 	log.Tracef("controller.Render() %s", c.Name())
 
-	title := c.title
-	isSelected := c.gui.CurrentView() == c.view
+	list, ok := c.graphicElement.(*tview.List)
+	if !ok {
+		return errors.New("unable to cast graphicElement to tview.List")
+	}
 
-	c.gui.Update(func(g *gocui.Gui) error {
-		if c.header == nil {
-			// shershen hack
-			return nil
-		}
+	list.Clear()
+	var headerStr string
+	if c.ftv.ShowFileAttributes {
+		headerStr = fmt.Sprintf(model.AttributeFormat, "Permission", "UID:GID", "Size", "Filetree")
+	} else {
+		headerStr = fmt.Sprintf(model.AttributeFormat, "Permission", "UID:GID", "Size", "Filetree")
+	}
+	c.graphicElement.SetTitle(headerStr)
 
-		// update the header
-		c.header.Clear()
-		width, _ := g.Size()
-		headerStr := format.FmtHeader(title, width, isSelected)
-		if c.ftv.ShowFileAttributes {
-			headerStr += fmt.Sprintf(model.AttributeFormat+" %s", "P", "ermission", "UID:GID", "Size", "Filetree")
-		}
-		_, _ = fmt.Fprintln(c.header, headerStr)
+	treeString := c.ftv.ModelTree.String(c.ftv.ShowFileAttributes)
+	lines := strings.Split(treeString, "\n")
+	for _, line := range lines {
+		list.AddItem(line, "", 'a', nil)
+	}
 
-		// update the contents
-		c.view.Clear()
-		err := c.ftv.Render()
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprint(c.view, c.ftv.Buffer.String())
-
-		return err
-	})
 	return nil
 }
 
@@ -326,59 +168,50 @@ func (c *FileTreeController) SetVisible(visible bool) error {
 	return nil
 }
 
-// Keymap indicates all the possible actions a user can take while the current pane is selected.
-func (c *FileTreeController) Keymap() string {
-	var keymaps string
-	for _, keymap := range c.keymaps {
-		keymaps += keymap.String()
-	}
-	return keymaps
+// GetPrimitive returns graphicElement used by tview framework to render the UI interface
+func (c *FileTreeController) GraphicElement() GraphicElement {
+	return c.graphicElement
 }
 
-// OnLayoutChange is called by the UI framework to inform the controller-model of the new screen dimensions
-func (c *FileTreeController) OnLayoutChange() error {
-	err := c.Update()
-	if err != nil {
-		return err
-	}
-	return c.Render()
-}
-
-func (c *FileTreeController) Layout(g *gocui.Gui, minX, minY, maxX, maxY int) error {
-	log.Tracef("controller.Layout(minX: %d, minY: %d, maxX: %d, maxY: %d) %s", minX, minY, maxX, maxY, c.Name())
-	attributeRowSize := 0
-
-	// make the layout responsive to the available realestate. Make more room for the main content by hiding auxillary
-	// content when there is not enough room
-	if maxX-minX < 60 {
-		c.ftv.ConstrainLayout()
-	} else {
-		c.ftv.ExpandLayout()
-	}
-
-	if c.ftv.ShowFileAttributes {
-		attributeRowSize = 1
-	}
-
-	// header + attribute header
-	headerSize := 1 + attributeRowSize
-	// note: maxY needs to account for the (invisible) border, thus a +1
-	header, headerErr := g.SetView(c.Name()+"header", minX, minY, maxX, minY+headerSize+1)
-	// we are going to overlap the controller over the (invisible) border (so minY will be one less than expected).
-	// additionally, maxY will be bumped by one to include the border
-	guiView, viewErr := g.SetView(c.Name(), minX, minY+headerSize, maxX, maxY+1)
-	if utils.IsNewView(viewErr, headerErr) {
-		err := c.Setup(guiView, header)
-		if err != nil {
-			log.Error("unable to setup tree controller", err)
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *FileTreeController) RequestedSize(available int) *int {
-	//var requestedWidth = int(float64(available) * (1.0 - c.requestedWidthRatio))
-	//return &requestedWidth
-	return nil
-}
+//func (c *FileTreeController) AddOnChangeListener(listener ...ViewOptionChangeListener) {
+//	c.listeners = append(c.listeners, listener...)
+//}
+//
+//// resetCursor moves the cursor back to the top of the buffer and translates to the top of the buffer.
+//func (c *FileTreeController) resetCursor() {
+//	c.ftv.ResetCursor()
+//}
+//
+//// CursorDown moves the cursor down and renders the controller.
+//func (c *FileTreeController) CursorDown() error {
+//	if c.ftv.CursorDown() {
+//		return c.Render()
+//	}
+//	return nil
+//}
+//
+//// CursorUp moves the cursor up and renders the controller.
+//func (c *FileTreeController) CursorUp() error {
+//	if c.ftv.CursorUp() {
+//		return c.Render()
+//	}
+//	return nil
+//}
+//
+//// PageDown moves to next page putting the cursor on top
+//func (c *FileTreeController) PageDown() error {
+//	err := c.ftv.PageDown()
+//	if err != nil {
+//		return err
+//	}
+//	return c.Render()
+//}
+//
+//// PageUp moves to previous page putting the cursor on top
+//func (c *FileTreeController) PageUp() error {
+//	err := c.ftv.PageUp()
+//	if err != nil {
+//		return err
+//	}
+//	return c.Render()
+//}
