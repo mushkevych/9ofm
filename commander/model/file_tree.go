@@ -151,6 +151,39 @@ func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) s
 	return result
 }
 
+// StringArrayBetween returns a partial tree in an ASCII representation.
+// start is inclusive, 0-based index pointer
+// stop is exclusive, 0-based index pointer
+func (tree *FileTreeModel) StringArrayBetween(start, stop int) ([][]string, []*FileNode) {
+	// account for use case when list of available files is less than available visual area
+	start = utils.MaxOf(start, 0)
+	stop = utils.MinOf(stop, tree.VisibleSize())
+
+	singleLine := func(node *FileNode) []string {
+		var line []string
+		line = append(line, node.MetadataString())
+		if node == tree.pwd {
+			line = append(line, "..")
+		} else {
+			line = append(line, node.String())
+		}
+		return line
+	}
+
+	var fileNodes []*FileNode
+	var result [][]string
+	keys := tree.sortedNamesInPwd()
+	for i := start; i < stop; i++ {
+		nodeNames := keys[i]
+		node := tree.GetNodeByName(nodeNames)
+		result = append(result, singleLine(node))
+		fileNodes = append(fileNodes, node)
+	}
+
+	return result, fileNodes
+}
+
+
 // Clone returns a copy of the given FileTreeModel
 func (tree *FileTreeModel) Clone() *FileTreeModel {
 	newTree := NewFileTreeModel()

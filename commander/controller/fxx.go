@@ -15,8 +15,8 @@ type FxxController struct {
 	name           string
 	graphicElement GraphicElement
 
-	sourceFileTree *FileTreeController
-	targetFileTree *FileTreeController
+	sourceFilePanel *FilePanelController
+	targetFilePanel *FilePanelController
 }
 
 // NewFxxController creates a new controller object attached the the global [gocui] screen object.
@@ -81,9 +81,9 @@ func (c *FxxController) Name() string {
 }
 
 // SetFilePanels sets active and inactive File Panels
-func (c *FxxController) SetFilePanels(activeFilePanel, targetFilePanel *FileTreeController) {
-	c.sourceFileTree = activeFilePanel
-	c.targetFileTree = targetFilePanel
+func (c *FxxController) SetFilePanels(activeFilePanel, targetFilePanel *FilePanelController) {
+	c.sourceFilePanel = activeFilePanel
+	c.targetFilePanel = targetFilePanel
 }
 
 // Update refreshes the state objects for future rendering (currently does nothing).
@@ -124,31 +124,31 @@ func (c *FxxController) dummy() error {
 	return nil
 }
 
-func (c *FxxController) refreshFilePanel(ftc *FileTreeController) error {
-	if ftc == nil {
+func (c *FxxController) refreshFilePanel(fpc *FilePanelController) error {
+	if fpc == nil {
 		return nil
 	}
 
-	fileTree, err := model.ReadFileTree(ftc.ftv.ModelTree.GetPwd())
+	fileTree, err := model.ReadFileTree(fpc.ftv.ModelTree.GetPwd())
 	if err != nil {
 		return err
 	}
 
-	ftc.ftv, err = view.NewFileTreeView(fileTree)
+	fpc.ftv, err = view.NewFileTreeView(fileTree)
 	if err != nil {
 		return err
 	}
 
-	return ftc.Render()
+	return fpc.Render()
 }
 
 func (c *FxxController) F5() error {
-	if c.sourceFileTree == nil || c.targetFileTree == nil {
+	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
 		return nil
 	}
 
-	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
-	targetFolder := c.targetFileTree.ftv.ModelTree.GetPwd()
+	sourceFileNode := c.sourceFilePanel.ftv.GetNodeAtCursor()
+	targetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
 	targetFileName := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
 
 	input, err := ioutil.ReadFile(sourceFileNode.AbsPath())
@@ -161,7 +161,7 @@ func (c *FxxController) F5() error {
 		return err
 	}
 
-	err = c.refreshFilePanel(c.targetFileTree)
+	err = c.refreshFilePanel(c.targetFilePanel)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (c *FxxController) F5() error {
 }
 
 func (c *FxxController) F6() error {
-	if c.sourceFileTree == nil || c.targetFileTree == nil {
+	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
 		return nil
 	}
 
@@ -184,12 +184,12 @@ func (c *FxxController) F6() error {
 		return err
 	}
 
-	err = c.refreshFilePanel(c.sourceFileTree)
+	err = c.refreshFilePanel(c.sourceFilePanel)
 	if err != nil {
 		return err
 	}
 
-	err = c.refreshFilePanel(c.targetFileTree)
+	err = c.refreshFilePanel(c.targetFilePanel)
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (c *FxxController) F6() error {
 }
 
 func (c *FxxController) F7() error {
-	if c.sourceFileTree == nil || c.targetFileTree == nil {
+	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
 		return nil
 	}
 
@@ -208,7 +208,7 @@ func (c *FxxController) F7() error {
 		return err
 	}
 
-	err = c.refreshFilePanel(c.sourceFileTree)
+	err = c.refreshFilePanel(c.sourceFilePanel)
 	if err != nil {
 		return err
 	}
@@ -217,18 +217,18 @@ func (c *FxxController) F7() error {
 }
 
 func (c *FxxController) F8() error {
-	if c.sourceFileTree == nil || c.targetFileTree == nil {
+	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
 		return nil
 	}
 
 	// TODO: add panel popup
-	sourceFileNode := c.sourceFileTree.ftv.GetNodeAtCursor()
+	sourceFileNode := c.sourceFilePanel.ftv.GetNodeAtCursor()
 	err := os.Remove(sourceFileNode.AbsPath())
 	if err != nil {
 		return err
 	}
 
-	err = c.refreshFilePanel(c.sourceFileTree)
+	err = c.refreshFilePanel(c.sourceFilePanel)
 	if err != nil {
 		return err
 	}

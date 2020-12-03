@@ -12,9 +12,9 @@ import (
 
 type Application struct {
 	tviewApp        *tview.Application
-	AlphaTree       *controller.FileTreeController
-	BetaTree        *controller.FileTreeController
-	activeFilePanel *controller.FileTreeController
+	AlphaPanel      *controller.FilePanelController
+	BetaPanel       *controller.FilePanelController
+	activeFilePanel *controller.FilePanelController
 	BottomRow       *controller.FxxController
 	Filter          *controller.FilterController
 	LayoutManager   *LayoutManager
@@ -22,8 +22,8 @@ type Application struct {
 
 func (app *Application) Renderers() []controller.Renderer {
 	return []controller.Renderer{
-		app.AlphaTree,
-		app.BetaTree,
+		app.AlphaPanel,
+		app.BetaPanel,
 		app.BottomRow,
 		app.Filter,
 	}
@@ -50,7 +50,7 @@ func buildControllers(tviewApp *tview.Application) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	AlphaTree, err := controller.NewFileTreeController(tviewApp, "alphaFileTree", alphaFileTree)
+	AlphaPanel, err := controller.NewFilePanelController(tviewApp, "alphaFilePanel", alphaFileTree)
 	if err != nil {
 		return nil, err
 	}
@@ -59,24 +59,24 @@ func buildControllers(tviewApp *tview.Application) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	BetaTree, err := controller.NewFileTreeController(tviewApp, "betaFileTree", betaFileTree)
+	BetaPanel, err := controller.NewFilePanelController(tviewApp, "betaFilePanel", betaFileTree)
 	if err != nil {
 		return nil, err
 	}
 
 	application := &Application{
 		tviewApp:        tviewApp,
-		AlphaTree:       AlphaTree,
-		BetaTree:        BetaTree,
-		activeFilePanel: AlphaTree,
+		AlphaPanel:      AlphaPanel,
+		BetaPanel:       BetaPanel,
+		activeFilePanel: AlphaPanel,
 		BottomRow:       controller.NewFxxController(tviewApp),
 		//Filter:          controller.NewFilterController(tviewApp),
 	}
 
 	// TODO: see if this can be removed, as well as AddOnChangeListener & onChangeListener
 	// update the status pane when a model option is changed by the user
-	//application.AlphaTree.AddOnChangeListener(application.onChangeListener)
-	//application.BetaTree.AddOnChangeListener(application.onChangeListener)
+	//application.AlphaPanel.AddOnChangeListener(application.onChangeListener)
+	//application.BetaPanel.AddOnChangeListener(application.onChangeListener)
 	//
 	// update the tree application while the user types into the filter application
 	//application.Filter.AddFilterEditListener(application.onFilterEdit)
@@ -111,9 +111,9 @@ func (app *Application) registerGlobalKeymaps() error {
 	return nil
 }
 
-func (app *Application) onChangeListener() error {
-	return nil
-}
+//func (app *Application) onChangeListener() error {
+//	return nil
+//}
 
 func (app *Application) onFilterEdit(filter string) error {
 	var filterRegex *regexp.Regexp
@@ -146,12 +146,12 @@ func (app *Application) Render() error {
 // ToggleActiveFilePanel switches between the two file panels
 func (app *Application) ToggleActiveFilePanel() (err error) {
 	v := app.tviewApp.GetFocus()
-	if v == nil || v == app.AlphaTree.GraphicElement() {
-		app.activeFilePanel = app.BetaTree
-		app.BottomRow.SetFilePanels(app.BetaTree, app.AlphaTree)
+	if v == nil || v == app.AlphaPanel.GraphicElement() {
+		app.activeFilePanel = app.BetaPanel
+		app.BottomRow.SetFilePanels(app.BetaPanel, app.AlphaPanel)
 	} else {
-		app.activeFilePanel = app.AlphaTree
-		app.BottomRow.SetFilePanels(app.AlphaTree, app.BetaTree)
+		app.activeFilePanel = app.AlphaPanel
+		app.BottomRow.SetFilePanels(app.AlphaPanel, app.BetaPanel)
 	}
 
 	return app.Render()
