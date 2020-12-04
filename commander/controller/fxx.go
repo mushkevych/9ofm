@@ -147,7 +147,7 @@ func (c *FxxController) F5() error {
 		return nil
 	}
 
-	sourceFileNode := c.sourceFilePanel.ftv.GetNodeAtCursor()
+	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
 	targetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
 	targetFileName := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
 
@@ -222,7 +222,7 @@ func (c *FxxController) F8() error {
 	}
 
 	// TODO: add panel popup
-	sourceFileNode := c.sourceFilePanel.ftv.GetNodeAtCursor()
+	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
 	err := os.Remove(sourceFileNode.AbsPath())
 	if err != nil {
 		return err

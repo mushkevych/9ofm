@@ -39,6 +39,7 @@ func NewFilePanelController(tviewApp *tview.Application, name string, fileTree *
 	table.SetTitle(name+"Table")
 	table.SetFixed(1, 0).SetSelectable(true, false).
 		SetSelectedFunc(func(row int, column int) {
+			// this is handler for tcell.KeyEnter
 			fileNode := table.GetCell(row, column).Reference
 			err = controller.navigateTo(fileNode.(*model.FileNode))
 		})
@@ -46,8 +47,6 @@ func NewFilePanelController(tviewApp *tview.Application, name string, fileTree *
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		var err error
 		switch event.Key() {
-		//case tcell.KeyEnter:
-		//	err = controller.navigateTo()
 		case tcell.KeyCtrlA:
 			err = controller.toggleShowDiffType(model.Added)
 		case tcell.KeyCtrlR:
@@ -56,8 +55,6 @@ func NewFilePanelController(tviewApp *tview.Application, name string, fileTree *
 			err = controller.toggleShowDiffType(model.Modified)
 		case tcell.KeyCtrlU:
 			err = controller.toggleShowDiffType(model.Unmodified)
-		case tcell.KeyCtrlB:
-			err = controller.toggleAttributes()
 		}
 
 		if err != nil {
@@ -80,11 +77,6 @@ func (c *FilePanelController) Name() string {
 
 // navigateTo will enter the directory
 func (c *FilePanelController) navigateTo(fileNode *model.FileNode) error {
-	if fileNode == nil {
-		// old pre-tview logic
-		fileNode = c.ftv.GetNodeAtCursor()
-	}
-
 	if fileNode.IsDir() || fileNode.AbsPath() == "/" {
 		fqfp := fileNode.AbsPath()
 		fileTree, err := model.ReadFileTree(fqfp)
@@ -98,6 +90,7 @@ func (c *FilePanelController) navigateTo(fileNode *model.FileNode) error {
 		}
 	}
 
+	c.graphicElement.(*tview.Table).Select(1, 0)
 	return c.Render()
 }
 
@@ -110,22 +103,6 @@ func (c *FilePanelController) notifyOnViewOptionChangeListeners() error {
 		}
 	}
 	return nil
-}
-
-// toggleAttributes will show/hide file attributes
-func (c *FilePanelController) toggleAttributes() error {
-	err := c.ftv.ToggleAttributes()
-	if err != nil {
-		return err
-	}
-
-	err = c.Render()
-	if err != nil {
-		return err
-	}
-
-	// we need to render the changes to the status pane as well (not just this contoller/controller)
-	return c.notifyOnViewOptionChangeListeners()
 }
 
 // toggleShowDiffType will show/hide the selected DiffType in the model pane.
@@ -164,6 +141,9 @@ func (c *FilePanelController) Render() error {
 
 	for idxRow, row := range rows {
 		for idxCol, col := range row {
+			// TODO: restore Cell.TextColor logic based from model.file_node
+			// diffTypeColor[node.Data.DiffType].Sprint(display)
+
 			table.SetCell(idxRow+1, idxCol,
 				tview.NewTableCell(col).
 					SetTextColor(tcell.ColorWhite).
@@ -172,6 +152,14 @@ func (c *FilePanelController) Render() error {
 		}
 	}
 	return nil
+}
+
+// IsVisible indicates if the file tree controller is currently initialized
+func (c *FilePanelController) GetSelectedFileNode() *model.FileNode {
+	table := c.graphicElement.(*tview.Table)
+	row, column := table.GetSelection()
+	fileNode := table.GetCell(row, column).Reference
+	return fileNode.(*model.FileNode)
 }
 
 // IsVisible indicates if the file tree controller is currently initialized

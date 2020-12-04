@@ -4,6 +4,12 @@ import (
 	"testing"
 )
 
+func checkError(t *testing.T, err error, message string) {
+	if err != nil {
+		t.Errorf(message+": %+v", err)
+	}
+}
+
 func TestAddChild(t *testing.T) {
 	var expected, actual int
 	tree := NewFileTreeModel()
