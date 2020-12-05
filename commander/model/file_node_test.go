@@ -156,7 +156,7 @@ func TestDirSize(t *testing.T) {
 	checkError(t, err, "unable to setup test")
 
 	node, _ := tree1.GetNode("/usr/bin")
-	expected, actual := "drwxr-xr-x         0:0      87 kB ", node.MetadataString()
+	expected, actual := "0 1 2", node.MetadataString()
 	if expected != actual {
 		t.Errorf("Expected metadata '%s' got '%s'", expected, actual)
 	}
