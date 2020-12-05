@@ -12,6 +12,13 @@ import (
 
 type ViewOptionChangeListener func() error
 
+var diffTypeColor = map[model.DiffType]tcell.Color{
+	model.Added:      tcell.ColorGreen,
+	model.Removed:    tcell.ColorRed,
+	model.Modified:   tcell.ColorYellow,
+	model.Unmodified: tcell.ColorWhite,
+}
+
 // FilePanelController holds the UI objects and data models for populating the File Tree Panel.
 type FilePanelController struct {
 	tviewApp       *tview.Application
@@ -164,14 +171,14 @@ func (c *FilePanelController) Render() error {
 
 	for idxRow, row := range rows {
 		for idxCol, col := range row {
-			// TODO: restore Cell.TextColor logic based from model.file_node
-			// diffTypeColor[node.Data.DiffType].Sprint(display)
+			fileNode := fileNodes[idxRow]
+			cellTextColor := diffTypeColor[fileNode.Data.DiffType]
 
 			table.SetCell(idxRow+1, idxCol,
 				tview.NewTableCell(col).
-					SetTextColor(tcell.ColorWhite).
+					SetTextColor(cellTextColor).
 					SetAlign(tview.AlignLeft).
-					SetReference(fileNodes[idxRow]))
+					SetReference(fileNode))
 		}
 	}
 	return nil

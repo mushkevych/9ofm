@@ -2,22 +2,13 @@ package model
 
 import (
 	"fmt"
+	"github.com/mushkevych/9ofm/utils"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/fatih/color"
-	"github.com/phayes/permbits" // plan9 incompatible
 )
-
-var diffTypeColor = map[DiffType]*color.Color{
-	Added:      color.New(color.FgGreen),
-	Removed:    color.New(color.FgRed),
-	Modified:   color.New(color.FgYellow),
-	Unmodified: color.New(color.Reset),
-}
 
 // FileNode represents a single file, its relation to files beneath it, the tree it exists in, and the metadata of the given file.
 type FileNode struct {
@@ -121,9 +112,7 @@ func (node *FileNode) MetadataAsStringArray() []string {
 	userGroup := fmt.Sprintf("%d:%d", user, group)
 
 	fileSize := strconv.FormatInt(node.Data.FileInfo.Size, 10)
-
-	// FIXME: this line is plan9 incompatible
-	filePermissions := permbits.FileMode(node.Data.FileInfo.Mode).String()
+	filePermissions := utils.FileMode(node.Data.FileInfo.Mode).String()
 
 	dir := "-"
 	if node.Data.FileInfo.IsDir() {
