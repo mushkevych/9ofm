@@ -1,3 +1,5 @@
+// +build plan9 linux
+
 package model
 
 import (
@@ -5,6 +7,8 @@ import (
 	"io"
 	"os"
 	"syscall"
+	//sysPlan9 "golang.org/x/sys/plan9"
+	//sysUnix "golang.org/x/sys/unix"
 
 	"github.com/cespare/xxhash"
 	log "github.com/sirupsen/logrus"
@@ -31,6 +35,7 @@ func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
 		hash = 0
 	}
 
+	// FIXME: this section is incompatible with Plan9
 	UID := -1
 	GID := -1
 	var stat *syscall.Stat_t

@@ -1,15 +1,23 @@
 package controller
 
+import (
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+)
+
 // Controller defines a renderable terminal screen pane.
 type Renderer interface {
-	Update() error
+	Name() string
 	Render() error
 	IsVisible() bool
 	SetVisible(bool) error
+	GraphicElement() GraphicElement
 }
 
-type Keymapper interface {
-	// Keymap return string with all the keyboard actions a user can take
-	// while the current pane is selected
-	Keymap() string
+type GraphicElement interface {
+	tview.Primitive
+	SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *tview.Box
+	GetInputCapture() func(event *tcell.EventKey) *tcell.EventKey
+	SetTitle(title string) *tview.Box
+	GetTitle() string
 }

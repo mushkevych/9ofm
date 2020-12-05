@@ -32,9 +32,6 @@ func init() {
 		Add("log.enabled", "true").
 
 		Add("diff.hide", "Modified,Added,Removed").
-
-		Add("filetree.pane-width", "0.5").
-		Add("filetree.show-attributes", "true").
 		Build()
 
 	if err != nil {

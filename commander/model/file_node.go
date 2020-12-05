@@ -2,25 +2,13 @@ package model
 
 import (
 	"fmt"
+	"github.com/mushkevych/9ofm/utils"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"sort"
-
-	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
-	"github.com/phayes/permbits" // plan9 incompatible
+	"strconv"
+	"strings"
 )
-
-const (
-	AttributeFormat = "%s%s %11s %10s "
-)
-
-var diffTypeColor = map[DiffType]*color.Color{
-	Added:      color.New(color.FgGreen),
-	Removed:    color.New(color.FgRed),
-	Modified:   color.New(color.FgYellow),
-	Unmodified: color.New(color.Reset),
-}
 
 // FileNode represents a single file, its relation to files beneath it, the tree it exists in, and the metadata of the given file.
 type FileNode struct {
@@ -109,48 +97,42 @@ func (node *FileNode) String() string {
 	if node.Data.FileInfo.Mode == os.ModeSymlink {
 		display += " → " + node.Data.FileInfo.Linkname
 	}
-	return diffTypeColor[node.Data.DiffType].Sprint(display)
+
+	return display
 }
 
-// MetadataString returns the FileNode metadata in a columnar string.
-func (node *FileNode) MetadataString() string {
+// MetadataString returns the FileNode metadata for columnar representation
+func (node *FileNode) MetadataAsStringArray() []string {
 	if node == nil {
-		return ""
+		return []string{""}
 	}
+
+	user := node.Data.FileInfo.Uid
+	group := node.Data.FileInfo.Gid
+	userGroup := fmt.Sprintf("%d:%d", user, group)
+
+	fileSize := strconv.FormatInt(node.Data.FileInfo.Size, 10)
+	filePermissions := utils.FileMode(node.Data.FileInfo.Mode).String()
 
 	dir := "-"
 	if node.Data.FileInfo.IsDir() {
 		dir = "d"
 	}
-	user := node.Data.FileInfo.Uid
-	group := node.Data.FileInfo.Gid
-	userGroup := fmt.Sprintf("%d:%d", user, group)
-
-	var sizeBytes int64
-
-	if node.IsLeaf() {
-		sizeBytes = node.Data.FileInfo.Size
-	} else {
-		sizer := func(curNode *FileNode) error {
-			// don't include file sizes of children that have been removed (unless the node in question is a removed dir,
-			// then show the accumulated size of removed files)
-			if curNode.Data.DiffType != Removed || node.Data.DiffType == Removed {
-				sizeBytes += curNode.Data.FileInfo.Size
-			}
-			return nil
-		}
-
-		err := node.DepthFirstSearch(sizer, nil)
-		if err != nil {
-			log.Errorf("unable to propagate node for metadata: %+v", err)
-		}
+	return []string{
+		dir + filePermissions, // file permissions as "rwxrwxrwx", preceded with "d" if this is a directory or "-" otherwise
+		userGroup,             // file owner as user:group
+		fileSize,              // file size in bytes
 	}
+}
 
-	size := humanize.Bytes(uint64(sizeBytes))
-
-	// FIXME: this line is plan9 incompatible
-	fileMode := permbits.FileMode(node.Data.FileInfo.Mode).String()
-	return diffTypeColor[node.Data.DiffType].Sprint(fmt.Sprintf(AttributeFormat, dir, fileMode, userGroup, size))
+// MetadataString returns the FileNode metadata in a columnar string.
+func (node *FileNode) MetadataString() string {
+	result := ""
+	tokens := node.MetadataAsStringArray()
+	for token := range tokens {
+		result += fmt.Sprintf("%v ", token)
+	}
+	return strings.TrimSpace(result)
 }
 
 // DepthFirstSearch starts at the tree root explores as far as possible along each branch before backtracking

@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,7 +29,6 @@ type FileTreeModel struct {
 	Size int
 
 	Name string
-	Id   uuid.UUID
 }
 
 // NewFileTreeModel creates an empty FileTreeModel
@@ -43,7 +41,6 @@ func NewFileTreeModel() (tree *FileTreeModel) {
 	tree.Root.Tree = tree
 	tree.Root.Children = make(map[string]*FileNode)
 	tree.pwd = tree.Root
-	tree.Id = uuid.New()
 	return tree
 }
 
@@ -150,6 +147,38 @@ func (tree *FileTreeModel) StringBetween(start, stop int, showAttributes bool) s
 
 	return result
 }
+
+// StringArrayBetween returns a partial tree in an ASCII representation.
+// start is inclusive, 0-based index pointer
+// stop is exclusive, 0-based index pointer
+func (tree *FileTreeModel) StringArrayBetween(start, stop int) ([][]string, []*FileNode) {
+	// account for use case when list of available files is less than available visual area
+	start = utils.MaxOf(start, 0)
+	stop = utils.MinOf(stop, tree.VisibleSize())
+
+	singleLine := func(node *FileNode) []string {
+		var line []string = node.MetadataAsStringArray()
+		if node == tree.pwd {
+			line = append(line, "..")
+		} else {
+			line = append(line, node.String())
+		}
+		return line
+	}
+
+	var fileNodes []*FileNode
+	var result [][]string
+	keys := tree.sortedNamesInPwd()
+	for i := start; i < stop; i++ {
+		nodeNames := keys[i]
+		node := tree.GetNodeByName(nodeNames)
+		result = append(result, singleLine(node))
+		fileNodes = append(fileNodes, node)
+	}
+
+	return result, fileNodes
+}
+
 
 // Clone returns a copy of the given FileTreeModel
 func (tree *FileTreeModel) Clone() *FileTreeModel {
@@ -307,34 +336,4 @@ func (tree *FileTreeModel) markRemoved(fqfp string) error {
 		return err
 	}
 	return node.AssignDiffType(Removed)
-}
-
-// Stack takes two trees and combines them together. This is done by "stacking" the given tree on top of the owning tree.
-func (tree *FileTreeModel) Stack(upper *FileTreeModel) (failed []PathError, stackErr error) {
-	graft := func(node *FileNode) error {
-		_, _, err := tree.AddPath(node.AbsPath(), node.Data.FileInfo)
-		if err != nil {
-			failed = append(failed, NewPathError(node.AbsPath(), ActionRemove, err))
-		}
-		return nil
-	}
-	stackErr = upper.DepthFirstSearch(graft, nil)
-	return failed, stackErr
-}
-
-// StackTreeRange combines an array of trees into a single tree
-func StackTreeRange(trees []*FileTreeModel, start, stop int) (*FileTreeModel, []PathError, error) {
-	errors := make([]PathError, 0)
-	tree := trees[0].Clone()
-	for idx := start; idx <= stop; idx++ {
-		failedPaths, err := tree.Stack(trees[idx])
-		if len(failedPaths) > 0 {
-			errors = append(errors, failedPaths...)
-		}
-		if err != nil {
-			log.Errorf("could not stack tree range: %v", err)
-			return nil, nil, err
-		}
-	}
-	return tree, errors, nil
 }

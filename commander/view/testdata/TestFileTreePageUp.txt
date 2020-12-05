@@ -1,3 +1,0 @@
-drwxr-xr-x         0:0      12 kB  etc
-drwxr-xr-x         0:0     8.2 kB  var
-

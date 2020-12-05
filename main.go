@@ -23,21 +23,26 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/mushkevych/9ofm/commander"
 	"github.com/mushkevych/9ofm/commander/configuration"
+	"github.com/rivo/tview"
 	"io/ioutil"
 	"os"
+	"sync"
 
-	"github.com/mushkevych/9ofm/commander"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	flgVersion bool
-	alphaRoot string
-	betaRoot string
+	alphaRoot  string
+	betaRoot   string
 
 	sha1ver   string // sha1 revision used to build the program
 	buildTime string // when the executable was built
+
+	once        sync.Once
+	application *commander.Application
 )
 
 func initLogging() {
@@ -66,10 +71,47 @@ func initLogging() {
 
 	log.SetLevel(level)
 	log.Debug("Starting 9ofm...")
-	//log.Debugf("config filepath: %s", config.Config.ConfigFileUsed())
-	//for k, v := range config.Config.AllSettings() {
-	//	log.Debug("config value: ", k, " : ", v)
-	//}
+}
+
+// Run is the UI entrypoint.
+func Run() error {
+	var err error
+
+	tviewApp := tview.NewApplication()
+	if err != nil {
+		return err
+	}
+	defer tviewApp.Stop()
+
+	once.Do(func() {
+		application, err = commander.NewApplication(tviewApp)
+		if err != nil {
+			return
+		}
+
+		// perform the first update and render now that all resources have been loaded
+		err = application.Render()
+		if err != nil {
+			return
+		}
+	})
+
+	if err := tviewApp.Run(); err != nil {
+		log.Error("main loop error: ", err)
+		return err
+	}
+	return nil
+}
+
+func start(events commander.EventChannel) {
+	var err error
+	defer close(events)
+
+	err = Run()
+	if err != nil {
+		events.ExitWithError(err)
+		return
+	}
 }
 
 func main() {
@@ -82,7 +124,11 @@ func main() {
 		fmt.Printf("Build on %s from sha1 %s\n", buildTime, sha1ver)
 		os.Exit(0)
 	}
-
 	initLogging()
-	commander.Start()
+
+	var events = make(commander.EventChannel)
+	go start(events)
+
+	exitCode := commander.MainEventLoop(events)
+	os.Exit(exitCode)
 }

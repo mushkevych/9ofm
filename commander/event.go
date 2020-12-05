@@ -1,31 +1,66 @@
 package commander
 
-type eventChannel chan event
+import (
+	"fmt"
+	log "github.com/sirupsen/logrus"
+	"os"
+)
 
-type event struct {
-	stdout      string
-	stderr      string
-	err         error
-	errorOnExit bool
+type EventChannel chan Event
+
+type Event struct {
+	Stdout      string
+	Stderr      string
+	Err         error
+	ErrorOnExit bool
 }
 
-func (ec eventChannel) message(msg string) {
-	ec <- event{
-		stdout: msg,
+func (ec EventChannel) Message(msg string) {
+	ec <- Event{
+		Stdout: msg,
 	}
 }
 
-func (ec eventChannel) exitWithError(err error) {
-	ec <- event{
-		err:         err,
-		errorOnExit: true,
+func (ec EventChannel) ExitWithError(err error) {
+	ec <- Event{
+		Err:         err,
+		ErrorOnExit: true,
 	}
 }
 
-func (ec eventChannel) exitWithErrorMessage(msg string, err error) {
-	ec <- event{
-		stderr:      msg,
-		err:         err,
-		errorOnExit: true,
+func (ec EventChannel) ExitWithErrorMessage(msg string, err error) {
+	ec <- Event{
+		Stderr:      msg,
+		Err:         err,
+		ErrorOnExit: true,
 	}
+}
+
+func MainEventLoop(events EventChannel) (exitCode int){
+	for event := range events {
+		if event.Stdout != "" {
+			fmt.Println(event.Stdout)
+		}
+
+		if event.Stderr != "" {
+			_, err := fmt.Fprintln(os.Stderr, event.Stderr)
+			if err != nil {
+				fmt.Println("error: could not write to buffer:", err)
+			}
+		}
+
+		if event.Err != nil {
+			log.Error(event.Err)
+			_, err := fmt.Fprintln(os.Stderr, event.Err.Error())
+			if err != nil {
+				fmt.Println("error: could not write to buffer:", err)
+			}
+		}
+
+		if event.ErrorOnExit {
+			exitCode = 1
+		}
+	}
+
+	return exitCode
 }

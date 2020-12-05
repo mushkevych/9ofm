@@ -2,7 +2,6 @@ package view
 
 import (
 	"bytes"
-	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"io/ioutil"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/commander/model"
 )
 
@@ -112,22 +110,12 @@ func initializeTestViewModel(t *testing.T) *FileTreeView {
 		}
 	}
 
-	format.Selected = color.New(color.ReverseVideo, color.Bold).SprintFunc()
 	return view
 }
 
 func runTestCase(t *testing.T, vm *FileTreeView, width, height int, filterRegex *regexp.Regexp) {
-	err := vm.Update(filterRegex, width, height)
-	if err != nil {
-		t.Errorf("failed to update view: %v", err)
-	}
-
-	err = vm.Render()
-	if err != nil {
-		t.Errorf("failed to render view: %v", err)
-	}
-
-	assertTestData(t, vm.Buffer.Bytes())
+	output := vm.ModelTree.String(true)
+	assertTestData(t, []byte(output))
 }
 
 func checkError(t *testing.T, err error, message string) {
@@ -140,9 +128,6 @@ func TestFileTreeGoCase(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 1000
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
 	runTestCase(t, vm, width, height, nil)
 }
 
@@ -150,9 +135,6 @@ func TestFileTreeNoAttributes(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 1000
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = false
-
 	runTestCase(t, vm, width, height, nil)
 }
 
@@ -160,126 +142,12 @@ func TestFileTreeRestrictedHeight(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 20
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = false
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileTreeDirCursor(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
-	moved := vm.CursorDown()
-	if !moved {
-		t.Error("unable to cursor down")
-	}
-
-	moved = vm.CursorDown()
-	if !moved {
-		t.Error("unable to cursor down")
-	}
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileTreeSelectLayer(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileShowAggregateChanges(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileTreePageDown(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 10
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-	err := vm.Update(nil, width, height)
-	checkError(t, err, "unable to update")
-
-	err = vm.PageDown()
-	checkError(t, err, "unable to page down")
-
-	err = vm.PageDown()
-	checkError(t, err, "unable to page down")
-
-	err = vm.PageDown()
-	checkError(t, err, "unable to page down")
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileTreePageUp(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 10
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
-	// these operations have a render step for intermediate results, which require at least one update to be done first
-	err := vm.Update(nil, width, height)
-	checkError(t, err, "unable to update")
-
-	err = vm.PageDown()
-	checkError(t, err, "unable to page down")
-
-	err = vm.PageDown()
-	checkError(t, err, "unable to page down")
-
-	err = vm.PageUp()
-	checkError(t, err, "unable to page up")
-
-	runTestCase(t, vm, width, height, nil)
-}
-
-func TestFileTreeDirNavigateTo(t *testing.T) {
-	vm := initializeTestViewModel(t)
-
-	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
-
-	moved := vm.CursorDown()
-	if !moved {
-		t.Error("unable to cursor down")
-	}
-
-	moved = vm.CursorDown()
-	if !moved {
-		t.Error("unable to cursor down")
-	}
-
-	// expand /etc
-	//err := vm.NavigateTo(nil)
-	//checkError(t, err, "unable to cursor right")
-
 	runTestCase(t, vm, width, height, nil)
 }
 
 func TestFileTreeFilterTree(t *testing.T) {
 	vm := initializeTestViewModel(t)
-
 	width, height := 100, 1000
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	regex, err := regexp.Compile("network")
 	if err != nil {
@@ -291,10 +159,7 @@ func TestFileTreeFilterTree(t *testing.T) {
 
 func TestFileTreeHideAddedRemovedModified(t *testing.T) {
 	vm := initializeTestViewModel(t)
-
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)
@@ -312,8 +177,6 @@ func TestFileTreeHideUnmodified(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide unmodified files
 	vm.ToggleShowDiffType(model.Unmodified)
@@ -325,8 +188,6 @@ func TestFileTreeHideTypeWithFilter(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)
