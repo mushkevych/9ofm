@@ -44,11 +44,6 @@ func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, er
 	return treeViewModel, nil
 }
 
-// IsVisible indicates if the file tree view pane is currently initialized
-func (v *FileTreeView) IsVisible() bool {
-	return v != nil
-}
-
 // ToggleShowDiffType will show/hide the selected DiffType in the FileTree pane.
 func (v *FileTreeView) ToggleShowDiffType(diffType model.DiffType) {
 	v.HiddenDiffTypes[diffType] = !v.HiddenDiffTypes[diffType]

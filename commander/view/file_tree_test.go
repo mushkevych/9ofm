@@ -2,7 +2,6 @@ package view
 
 import (
 	"bytes"
-	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"io/ioutil"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/mushkevych/9ofm/commander/format"
 	"github.com/mushkevych/9ofm/commander/model"
 )
 
@@ -112,17 +110,11 @@ func initializeTestViewModel(t *testing.T) *FileTreeView {
 		}
 	}
 
-	format.Selected = color.New(color.ReverseVideo, color.Bold).SprintFunc()
 	return view
 }
 
 func runTestCase(t *testing.T, vm *FileTreeView, width, height int, filterRegex *regexp.Regexp) {
-	err := vm.Update(filterRegex, width, height)
-	if err != nil {
-		t.Errorf("failed to update view: %v", err)
-	}
-
-	err = vm.Render()
+	output := vm.ModelTree.String()
 	if err != nil {
 		t.Errorf("failed to render view: %v", err)
 	}
@@ -254,8 +246,6 @@ func TestFileTreeDirNavigateTo(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	moved := vm.CursorDown()
 	if !moved {
@@ -278,8 +268,6 @@ func TestFileTreeFilterTree(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 1000
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	regex, err := regexp.Compile("network")
 	if err != nil {
@@ -293,8 +281,6 @@ func TestFileTreeHideAddedRemovedModified(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)
@@ -312,8 +298,6 @@ func TestFileTreeHideUnmodified(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide unmodified files
 	vm.ToggleShowDiffType(model.Unmodified)
@@ -325,8 +309,6 @@ func TestFileTreeHideTypeWithFilter(t *testing.T) {
 	vm := initializeTestViewModel(t)
 
 	width, height := 100, 100
-	vm.Setup(0, height)
-	vm.ShowFileAttributes = true
 
 	// hide added files
 	vm.ToggleShowDiffType(model.Added)

@@ -34,6 +34,11 @@ func NewApplication(tviewApp *tview.Application) (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = application.registerGlobalKeymaps()
+	if err != nil {
+		return nil, err
+	}
 	return application, nil
 }
 

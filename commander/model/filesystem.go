@@ -16,9 +16,6 @@ func ReadFileTree(fqfp string) (*FileTreeModel, error) {
 
 		fileInfo := NewFileInfo(path, info, err)
 		_, _, err = fileTree.AddPath(path, fileInfo)
-		//if err != nil {
-		//	return err
-		//}
 
 		if fileInfo.IsDir() && path != fqfp {
 			return filepath.SkipDir // skip walking nested directories and its content.

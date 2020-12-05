@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,7 +29,6 @@ type FileTreeModel struct {
 	Size int
 
 	Name string
-	Id   uuid.UUID
 }
 
 // NewFileTreeModel creates an empty FileTreeModel
@@ -43,7 +41,6 @@ func NewFileTreeModel() (tree *FileTreeModel) {
 	tree.Root.Tree = tree
 	tree.Root.Children = make(map[string]*FileNode)
 	tree.pwd = tree.Root
-	tree.Id = uuid.New()
 	return tree
 }
 

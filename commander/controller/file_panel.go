@@ -38,10 +38,34 @@ func NewFilePanelController(tviewApp *tview.Application, name string, fileTree *
 	table := tview.NewTable().SetBorders(false).SetSeparator('│')
 	table.SetTitle(name+"Table")
 	table.SetFixed(1, 0).SetSelectable(true, false).
+		// SetSelectedFunc function is handler for tcell.KeyEnter
 		SetSelectedFunc(func(row int, column int) {
-			// this is handler for tcell.KeyEnter
-			fileNode := table.GetCell(row, column).Reference
-			err = controller.navigateTo(fileNode.(*model.FileNode))
+			fileNode, ok := table.GetCell(row, column).Reference.(*model.FileNode)
+			if !ok {
+				log.Errorf("unable to cast cell.Reference to model.FileNode")
+			}
+
+			FILE_NAME_COLUMN_INDEX := 3
+			selectedFileName := ".."
+			if table.GetCell(row, FILE_NAME_COLUMN_INDEX).Text == ".." {
+				selectedFileName = fileNode.Name
+				fileNode = fileNode.Parent
+			}
+			err = controller.navigateTo(fileNode)
+			if err != nil {
+				log.Errorf("error in table.SetSelectedFunc->navigateTo(%v)", fileNode)
+			}
+
+			newSelectedRow := 1  // row that should be selected after navigateTo function is complete
+			for rowIdx := 1; rowIdx < table.GetRowCount(); rowIdx++ {
+				if table.GetCell(rowIdx, FILE_NAME_COLUMN_INDEX).Text == selectedFileName {
+					newSelectedRow = rowIdx
+					break
+				}
+			}
+
+			table.SetOffset(newSelectedRow, 0)
+			table.Select(newSelectedRow, 0)
 		})
 
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -90,7 +114,6 @@ func (c *FilePanelController) navigateTo(fileNode *model.FileNode) error {
 		}
 	}
 
-	c.graphicElement.(*tview.Table).Select(1, 0)
 	return c.Render()
 }
 

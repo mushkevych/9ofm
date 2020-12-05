@@ -4,12 +4,8 @@ go 1.15
 
 require (
 	github.com/cespare/xxhash v1.1.0
-	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.9.0
 	github.com/gdamore/tcell/v2 v2.0.1-0.20201017141208-acf90d56d591
-	github.com/google/uuid v1.1.2
-	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/lunixbochs/vtclean v1.0.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/phayes/permbits v0.0.0-20190612203442-39d7c581d2ee
 	github.com/rivo/tview v0.0.0-20201118063654-f007e9ad3893
