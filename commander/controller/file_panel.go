@@ -75,6 +75,13 @@ func NewFilePanelController(tviewApp *tview.Application, name string, fileTree *
 			table.Select(newSelectedRow, 0)
 		})
 
+	table.SetSelectionChangedFunc(func(row, column int) {
+		if row, _ := table.GetSelection(); row == 0 {
+			// select top-most row, instead of a header
+			table.Select(1, 0)
+		}
+	})
+
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		var err error
 		switch event.Key() {
@@ -180,6 +187,11 @@ func (c *FilePanelController) Render() error {
 					SetAlign(tview.AlignLeft).
 					SetReference(fileNode))
 		}
+	}
+
+	if row, _ := table.GetSelection(); row == 0 {
+		// select top-most row, instead of a header
+		table.Select(1, 0)
 	}
 	return nil
 }

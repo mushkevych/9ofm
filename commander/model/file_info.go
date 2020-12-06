@@ -27,36 +27,31 @@ type FileInfo struct {
 	Err      error // error discovered while retrieving metadata about this file, such as Insufficient Permission
 }
 
+//func GetXid(fqfp string, info os.FileInfo) (int, int) {
+//	// FIXME: this section is incompatible with Plan9
+//	UID := -1
+//	GID := -1
+//	if stat, ok := info.Sys().(*sysUnix.Stat_t); ok {
+//		UID = int(stat.Uid)
+//		GID = int(stat.Gid)
+//	}
+//	return UID, GID
+//}
+
 // NewFileInfo extracts the metadata from the info and file contents and generates a new FileInfo object.
 func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
-	var hash uint64
-	if !info.IsDir() {
-		// hash = computeFileHash(fqfp)
-		hash = 0
-	}
-
 	// FIXME: this section is incompatible with Plan9
 	UID := -1
 	GID := -1
-	var stat *syscall.Stat_t
-	var ok bool
-	if fileStats, err := os.Stat(fqfp); err == nil {
-		stat, ok = fileStats.Sys().(*syscall.Stat_t)
-	} else {
-		if !os.IsNotExist(err) {
-			// file exist and this must be something nasty
-			log.Panicf(fmt.Sprintf("could not retrieve os.Stats: '%s' (path: '%s')", err, fqfp))
-		} else {
-			// this is likely a broken symlink
-			log.Warningf(fmt.Sprintf("retrieving os.Stats from os.FileInfo due to: '%s' (path: '%s')", err, fqfp))
-			stat, ok = info.Sys().(*syscall.Stat_t)
-		}
-	}
-
-	if ok && stat != nil {
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 		UID = int(stat.Uid)
 		GID = int(stat.Gid)
 	}
+
+	var hash uint64 = 0
+	//if !info.IsDir() {
+	//	hash = computeFileHash(fqfp)
+	//}
 
 	return FileInfo{
 		Fqfp:     fqfp,
