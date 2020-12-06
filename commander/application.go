@@ -73,13 +73,13 @@ func buildControllers(tviewApp *tview.Application) (*Application, error) {
 }
 
 func (app *Application) buildLayout() error {
-	app.flexLayout.
+	app.flexLayout.SetDirection(tview.FlexRow).
 		AddItem(tview.NewBox().SetBorder(true).SetTitle("Header"), 1, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexColumn).
 			AddItem(app.AlphaPanel.GraphicElement(), 0, 1, false).
 			AddItem(app.BetaPanel.GraphicElement(), 0, 1, false),
-			0, 1, false).
-		AddItem(app.BottomRow.GraphicElement(), 2, 1, false)
+			0, 8, false).
+		AddItem(app.BottomRow.GraphicElement(), 1, 1, false)
 
 	app.tviewApp.SetRoot(app.flexLayout, true).SetFocus(app.AlphaPanel.GraphicElement())
 	return nil

@@ -2,7 +2,7 @@ package view
 
 import (
 	"fmt"
-	"github.com/mushkevych/9ofm/commander/configuration"
+	"github.com/mushkevych/9ofm/commander/system"
 	"strings"
 
 	"github.com/mushkevych/9ofm/commander/model"
@@ -25,7 +25,7 @@ func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, er
 	treeViewModel.ModelTree = tree
 	treeViewModel.HiddenDiffTypes = make([]bool, 4)
 
-	hiddenTypes := configuration.Config.GetStringSlice("diff.hide", ",")
+	hiddenTypes := system.Config.GetStringSlice("diff.hide", ",")
 	for _, hType := range hiddenTypes {
 		switch t := strings.ToLower(hType); t {
 		case "added":

@@ -24,7 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mushkevych/9ofm/commander"
-	"github.com/mushkevych/9ofm/commander/configuration"
+	"github.com/mushkevych/9ofm/commander/system"
 	"github.com/rivo/tview"
 	"io/ioutil"
 	"os"
@@ -49,8 +49,8 @@ func initLogging() {
 	var logFileObj *os.File
 	var err error
 
-	if configuration.Config.GetBool("log.enabled") {
-		logFileObj, err = os.OpenFile(configuration.Config.GetString("log.path"), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if system.Config.GetBool("log.enabled") {
+		logFileObj, err = os.OpenFile(system.Config.GetString("log.path"), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		log.SetOutput(logFileObj)
 	} else {
 		log.SetOutput(ioutil.Discard)
@@ -64,7 +64,7 @@ func initLogging() {
 	Formatter.DisableTimestamp = true
 	log.SetFormatter(Formatter)
 
-	level, err := log.ParseLevel(configuration.Config.GetString("log.level"))
+	level, err := log.ParseLevel(system.Config.GetString("log.level"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -103,7 +103,7 @@ func Run() error {
 	return nil
 }
 
-func start(events commander.EventChannel) {
+func start(events system.EventChannel) {
 	var err error
 	defer close(events)
 
@@ -126,9 +126,9 @@ func main() {
 	}
 	initLogging()
 
-	var events = make(commander.EventChannel)
-	go start(events)
+	messageBus := system.NewEventChannel()
+	go start(messageBus)
 
-	exitCode := commander.MainEventLoop(events)
+	exitCode := system.MainEventLoop(messageBus)
 	os.Exit(exitCode)
 }

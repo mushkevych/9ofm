@@ -1,4 +1,4 @@
-package commander
+package system
 
 import (
 	"fmt"
@@ -15,9 +15,23 @@ type Event struct {
 	ErrorOnExit bool
 }
 
+var MessageBus EventChannel
+
+func NewEventChannel() EventChannel {
+	MessageBus = make(EventChannel)
+	return MessageBus
+}
+
+
 func (ec EventChannel) Message(msg string) {
 	ec <- Event{
 		Stdout: msg,
+	}
+}
+
+func (ec EventChannel) Error(msg string) {
+	ec <- Event{
+		Stderr: msg,
 	}
 }
 
@@ -36,7 +50,7 @@ func (ec EventChannel) ExitWithErrorMessage(msg string, err error) {
 	}
 }
 
-func MainEventLoop(events EventChannel) (exitCode int){
+func MainEventLoop(events EventChannel) (exitCode int) {
 	for event := range events {
 		if event.Stdout != "" {
 			fmt.Println(event.Stdout)
