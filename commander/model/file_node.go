@@ -109,7 +109,7 @@ func (node *FileNode) MetadataAsStringArray() []string {
 
 	user := node.Data.FileInfo.Uid
 	group := node.Data.FileInfo.Gid
-	userGroup := fmt.Sprintf("%d:%d", user, group)
+	userGroup := fmt.Sprintf("%s:%s", user, group)
 
 	fileSize := strconv.FormatInt(node.Data.FileInfo.Size, 10)
 	filePermissions := utils.FileMode(node.Data.FileInfo.Mode).String()

@@ -8,8 +8,8 @@ import (
 	"github.com/mushkevych/9ofm/commander/model"
 )
 
-// FileTreeViewModel holds the UI objects and data models for populating the right pane. Specifically the pane that
-// shows selected layer or aggregate file ASCII tree.
+// FileTreeViewModel is a wrapper around FileTreeModel
+// TODO: either remove in favour of FileTreeModel, or move more UI code into FileTreeView
 type FileTreeView struct {
 	// Tree model that holds representation of the filesystem for given path
 	ModelTree *model.FileTreeModel

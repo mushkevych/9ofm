@@ -4,14 +4,10 @@ package model
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"syscall"
-	//sysPlan9 "golang.org/x/sys/plan9"
-	//sysUnix "golang.org/x/sys/unix"
-
 	"github.com/cespare/xxhash"
 	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
 )
 
 // FileInfo contains tar metadata for a specific FileNode
@@ -22,31 +18,14 @@ type FileInfo struct {
 	hash     uint64
 	Size     int64
 	Mode     os.FileMode
-	Uid      int   // User Id - owner of the file
-	Gid      int   // Group Id - owner of the file
-	Err      error // error discovered while retrieving metadata about this file, such as Insufficient Permission
+	Uid      string // User Id - owner of the file
+	Gid      string // Group Id - owner of the file
+	Err      error  // error discovered while retrieving metadata about this file, such as Insufficient Permission
 }
-
-//func GetXid(fqfp string, info os.FileInfo) (int, int) {
-//	// FIXME: this section is incompatible with Plan9
-//	UID := -1
-//	GID := -1
-//	if stat, ok := info.Sys().(*sysUnix.Stat_t); ok {
-//		UID = int(stat.Uid)
-//		GID = int(stat.Gid)
-//	}
-//	return UID, GID
-//}
 
 // NewFileInfo extracts the metadata from the info and file contents and generates a new FileInfo object.
 func NewFileInfo(fqfp string, info os.FileInfo, err error) FileInfo {
-	// FIXME: this section is incompatible with Plan9
-	UID := -1
-	GID := -1
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		UID = int(stat.Uid)
-		GID = int(stat.Gid)
-	}
+	UID, GID := GetXid(info)
 
 	var hash uint64 = 0
 	//if !info.IsDir() {
