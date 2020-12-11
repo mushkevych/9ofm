@@ -81,7 +81,9 @@ func (app *Application) buildLayout() error {
 			0, 8, false).
 		AddItem(app.BottomRow.GraphicElement(), 1, 1, false)
 
-	app.tviewApp.SetRoot(app.flexLayout, true).SetFocus(app.AlphaPanel.GraphicElement())
+	app.tviewApp.SetRoot(app.flexLayout, true).EnableMouse(true)
+	app.tviewApp.SetFocus(app.AlphaPanel.GraphicElement())
+	app.BottomRow.SetFilePanels(app.AlphaPanel, app.BetaPanel)
 	return nil
 }
 
@@ -104,6 +106,10 @@ func (app *Application) registerGlobalKeymaps() error {
 		switch event.Key() {
 		case tcell.KeyTab:
 			err = app.ToggleActiveFilePanel()
+		default:
+			// adding F1-F12 key hook to the global keymaps
+			fxxEventHandler := app.BottomRow.GraphicElement().GetInputCapture()
+			fxxEventHandler(event)
 		}
 
 		if err != nil {

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"github.com/gdamore/tcell/v2"
 	"github.com/mushkevych/9ofm/commander/model"
 	"github.com/mushkevych/9ofm/commander/system"
 	"github.com/mushkevych/9ofm/commander/view"
@@ -69,6 +70,27 @@ func NewFxxController(tviewApp *tview.Application) (controller *FxxController) {
 		AddItem(buttonF8, 0, 1, false).
 		AddItem(buttonF9, 0, 1, false).
 		AddItem(buttonF10, 0, 1, false)
+
+	controller.graphicElement.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		var err error
+		switch event.Key() {
+		case tcell.KeyF5:
+			err = controller.F5()
+		case tcell.KeyF6:
+			err = controller.F6()
+		case tcell.KeyF7:
+			err = controller.F7()
+		case tcell.KeyF8:
+			err = controller.F8()
+		case tcell.KeyF10:
+			err = controller.F10()
+		}
+
+		if err != nil {
+			log.WithError(err)
+		}
+		return event
+	})
 
 	return controller
 }
@@ -218,7 +240,7 @@ func (c *FxxController) F7() error {
 		},
 		)
 	form.SetBorder(true).SetTitle("Create Folder").SetTitleAlign(tview.AlignCenter)
-	c.tviewApp.SetFocus(form)
+	c.tviewApp.SetRoot(form, false).SetFocus(form)
 
 	err := c.refreshFilePanel(c.sourceFilePanel)
 	if err != nil {
