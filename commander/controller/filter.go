@@ -1,7 +1,8 @@
 package controller
 
 import (
-	"github.com/rivo/tview"
+	tview "gitlab.com/tslocum/cview"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,7 +21,7 @@ type FilterController struct {
 	filterEditListeners []FilterEditListener
 }
 
-// NewFilterController creates a new controller object attached the the global [gocui] screen object.
+// NewFilterController creates a new controller object attached the the global [tview] screen object.
 func NewFilterController(tviewApp *tview.Application) (controller *FilterController) {
 	controller = new(FilterController)
 

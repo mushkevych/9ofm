@@ -17,7 +17,7 @@ type FileTreeView struct {
 	HiddenDiffTypes []bool
 }
 
-// NewFileTreeView creates a new view object attached the the global [gocui] screen object.
+// NewFileTreeView creates a new view object attached the the global [tview] screen object.
 func NewFileTreeView(tree *model.FileTreeModel) (treeViewModel *FileTreeView, err error) {
 	treeViewModel = new(FileTreeView)
 

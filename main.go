@@ -25,7 +25,8 @@ import (
 	"fmt"
 	"github.com/mushkevych/9ofm/commander"
 	"github.com/mushkevych/9ofm/commander/system"
-	"github.com/rivo/tview"
+	tview "gitlab.com/tslocum/cview"
+
 	"io/ioutil"
 	"os"
 	"sync"

@@ -5,8 +5,8 @@ import (
 	"github.com/mushkevych/9ofm/commander/model"
 	"github.com/mushkevych/9ofm/commander/system"
 	"github.com/mushkevych/9ofm/commander/view"
-	"github.com/rivo/tview"
 	log "github.com/sirupsen/logrus"
+	tview "gitlab.com/tslocum/cview"
 	"io/ioutil"
 	"os"
 )
@@ -14,6 +14,7 @@ import (
 // FxxController defines the bottom UI row with F1-F12 functional keys, and related properties and functions
 type FxxController struct {
 	tviewApp       *tview.Application
+	pages          *tview.Pages
 	name           string
 	graphicElement GraphicElement
 
@@ -21,55 +22,49 @@ type FxxController struct {
 	targetFilePanel *FilePanelController
 }
 
-// NewFxxController creates a new controller object attached the the global [gocui] screen object.
-func NewFxxController(tviewApp *tview.Application) (controller *FxxController) {
+// NewFxxController creates a new controller object attached the the global [tview] screen object.
+func NewFxxController(tviewApp *tview.Application, pages *tview.Pages) (controller *FxxController) {
 	controller = new(FxxController)
 
 	// populate main fields
 	controller.tviewApp = tviewApp
+	controller.pages = pages
 	controller.name = "bottom_row"
 
 	// create tview graphicElement
 	buttonHeight := 3 // number of rows
 	buttonWidth := 10 // number of chars
 
-	buttonF2 := tview.NewButton("F2: RENAME").SetSelectedFunc(nil)
-	buttonF2.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
+	buttonFactory := func(label string, handler func()) *tview.Button {
+		button := tview.NewButton(label)
+		button.SetSelectedFunc(handler)
+		button.SetBorder(false)
+		button.SetRect(0, 0, buttonWidth, buttonHeight)
+		return button
+	}
 
-	buttonF3 := tview.NewButton("F3: VIEW").SetSelectedFunc(nil)
-	buttonF3.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
+	buttonF2 := buttonFactory("F2: RENAME", nil)
+	buttonF3 := buttonFactory("F3: VIEW", nil)
+	buttonF4 := buttonFactory("F4: EDIT", nil)
+	buttonF5 := buttonFactory("F5: COPY", func() { _ = controller.F5 })
+	buttonF6 := buttonFactory("F6: HELP", func() { _ = controller.F6 })
+	buttonF7 := buttonFactory("F7: MKDIR", func() { _ = controller.F7 })
+	buttonF8 := buttonFactory("F8: RM", func() { _ = controller.F8 })
+	buttonF9 := buttonFactory("F9: TERM", nil)
+	buttonF10 := buttonFactory("F10: EXIT", func() { _ = controller.F10 })
 
-	buttonF4 := tview.NewButton("F4: EDIT").SetSelectedFunc(nil)
-	buttonF4.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF5 := tview.NewButton("F5: COPY").SetSelectedFunc(func() { _ = controller.F5 })
-	buttonF5.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF6 := tview.NewButton("F6: HELP").SetSelectedFunc(func() { _ = controller.F6 })
-	buttonF6.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF7 := tview.NewButton("F7: MKDIR").SetSelectedFunc(func() { _ = controller.F7 })
-	buttonF7.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF8 := tview.NewButton("F8: RM").SetSelectedFunc(func() { _ = controller.F8 })
-	buttonF8.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF9 := tview.NewButton("F9: TERM").SetSelectedFunc(nil)
-	buttonF9.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	buttonF10 := tview.NewButton("F10: EXIT").SetSelectedFunc(func() { _ = controller.F10 })
-	buttonF10.SetBorder(false).SetRect(0, 0, buttonWidth, buttonHeight)
-
-	controller.graphicElement = tview.NewFlex().SetDirection(tview.FlexColumn).
-		AddItem(buttonF2, 0, 1, false).
-		AddItem(buttonF3, 0, 1, false).
-		AddItem(buttonF4, 0, 1, false).
-		AddItem(buttonF5, 0, 1, false).
-		AddItem(buttonF6, 0, 1, false).
-		AddItem(buttonF7, 0, 1, false).
-		AddItem(buttonF8, 0, 1, false).
-		AddItem(buttonF9, 0, 1, false).
-		AddItem(buttonF10, 0, 1, false)
+	flex := tview.NewFlex()
+	flex.SetDirection(tview.FlexColumn)
+	flex.AddItem(buttonF2, 0, 1, false)
+	flex.AddItem(buttonF3, 0, 1, false)
+	flex.AddItem(buttonF4, 0, 1, false)
+	flex.AddItem(buttonF5, 0, 1, false)
+	flex.AddItem(buttonF6, 0, 1, false)
+	flex.AddItem(buttonF7, 0, 1, false)
+	flex.AddItem(buttonF8, 0, 1, false)
+	flex.AddItem(buttonF9, 0, 1, false)
+	flex.AddItem(buttonF10, 0, 1, false)
+	controller.graphicElement = flex
 
 	controller.graphicElement.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		var err error
@@ -221,32 +216,36 @@ func (c *FxxController) F7() error {
 		return nil
 	}
 
+	formId := "formMkdir"
 	label := "New directory name:"
-	form := tview.NewForm()
-	form.AddInputField(label, "", 20, nil, nil).
-		AddButton("OK", func() {
-			newFolderName := form.GetFormItemByLabel(label).(*tview.InputField).GetText()
-			err := os.Mkdir(newFolderName, 0755)
+	modalForm := tview.NewModal()
+	modalForm.SetBorder(true)
+	modalForm.SetTitle("Create Folder")
+	modalForm.SetTitleAlign(tview.AlignCenter)
+	modalForm.GetForm().AddInputField(label, "", 20, nil, nil)
+	modalForm.AddButtons([]string{"OK", "Cancel"})
+	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		switch buttonLabel {
+		case "OK":
+			newFolderName := modalForm.GetForm().GetFormItemByLabel(label).(*tview.InputField).GetText()
+			fqfp := c.sourceFilePanel.GetPwd() + string(os.PathSeparator) + newFolderName
+			err := os.Mkdir(fqfp, 0755)
 			if err != nil {
 				system.MessageBus.Error(err.Error())
 			}
-		}).
-		AddButton("Cancel", func() {
-			c.tviewApp.SetFocus(c.sourceFilePanel.GraphicElement())
-			err := c.refreshFilePanel(c.sourceFilePanel)
+
+			err = c.refreshFilePanel(c.sourceFilePanel)
 			if err != nil {
 				system.MessageBus.Error(err.Error())
 			}
-		},
-		)
-	form.SetBorder(true).SetTitle("Create Folder").SetTitleAlign(tview.AlignCenter)
-	c.tviewApp.SetRoot(form, false).SetFocus(form)
 
-	err := c.refreshFilePanel(c.sourceFilePanel)
-	if err != nil {
-		return err
-	}
+			c.hideModalForm(formId)
+		case "Cancel":
+			c.hideModalForm(formId)
+		}
+	})
 
+	c.showModalForm(formId, modalForm)
 	return nil
 }
 
@@ -255,25 +254,44 @@ func (c *FxxController) F8() error {
 		return nil
 	}
 
-	// TODO: add panel popup
-	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
-	err := os.Remove(sourceFileNode.AbsPath())
-	if err != nil {
-		return err
-	}
+	formId := "formRmdir"
+	label := "Delete Folder"
+	modalForm := tview.NewModal()
+	modalForm.SetBorder(true)
+	modalForm.SetTitle("Delete Folder")
+	modalForm.SetTitleAlign(tview.AlignCenter)
 
-	err = c.refreshFilePanel(c.sourceFilePanel)
-	if err != nil {
-		return err
-	}
+	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
+	modalForm.GetForm().AddInputField(label, sourceFileNode.AbsPath(), 20, func(text string, ch rune) bool {return false}, nil)
+	modalForm.AddButtons([]string{"OK", "Cancel"})
+	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		switch buttonLabel {
+		case "OK":
+			err := os.Remove(sourceFileNode.AbsPath())
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			err = c.refreshFilePanel(c.sourceFilePanel)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			c.hideModalForm(formId)
+		case "Cancel":
+			c.hideModalForm(formId)
+		}
+	})
+
+	c.showModalForm(formId, modalForm)
 	return nil
 }
 
 func (c *FxxController) F10() error {
-	modalWindow := tview.NewModal().
-		SetText("Do you want to quit the application?").
-		AddButtons([]string{"Quit", "Cancel"}).
-		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+	modalWindow := tview.NewModal()
+	modalWindow.SetText("Do you want to quit the application?")
+	modalWindow.AddButtons([]string{"Quit", "Cancel"})
+	modalWindow.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonLabel == "Quit" {
 				_ = c.exit()
 			}
@@ -283,4 +301,19 @@ func (c *FxxController) F10() error {
 	c.tviewApp.SetRoot(modalWindow, false)
 
 	return nil
+}
+
+func (c *FxxController) hideModalForm(formId string) {
+	c.pages.HidePage(formId)
+	c.pages.RemovePage(formId)
+	c.tviewApp.SetFocus(c.sourceFilePanel.graphicElement)
+}
+
+func (c *FxxController) showModalForm(formId string, form tview.Primitive) {
+	c.pages.AddPage(
+		formId,
+		form,
+		false,
+		true,
+	)
 }

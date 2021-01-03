@@ -4,7 +4,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/mushkevych/9ofm/commander/controller"
 	"github.com/mushkevych/9ofm/commander/model"
-	"github.com/rivo/tview"
+	tview "gitlab.com/tslocum/cview"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,6 +15,7 @@ type Application struct {
 	BetaPanel  *controller.FilePanelController
 	BottomRow  *controller.FxxController
 	flexLayout *tview.Flex
+	pages      *tview.Pages
 }
 
 func (app *Application) Renderers() []controller.Renderer {
@@ -61,27 +63,42 @@ func buildControllers(tviewApp *tview.Application) (*Application, error) {
 		return nil, err
 	}
 
+	pages := tview.NewPages()
 	application := &Application{
 		tviewApp:   tviewApp,
 		AlphaPanel: AlphaPanel,
 		BetaPanel:  BetaPanel,
-		BottomRow:  controller.NewFxxController(tviewApp),
+		BottomRow:  controller.NewFxxController(tviewApp, pages),
 		flexLayout: tview.NewFlex(),
+		pages:      pages,
 	}
 
 	return application, nil
 }
 
 func (app *Application) buildLayout() error {
-	app.flexLayout.SetDirection(tview.FlexRow).
-		AddItem(tview.NewBox().SetBorder(true).SetTitle("Header"), 1, 1, false).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexColumn).
-			AddItem(app.AlphaPanel.GraphicElement(), 0, 1, false).
-			AddItem(app.BetaPanel.GraphicElement(), 0, 1, false),
-			0, 8, false).
-		AddItem(app.BottomRow.GraphicElement(), 1, 1, false)
+	app.flexLayout.SetDirection(tview.FlexRow)
 
-	app.tviewApp.SetRoot(app.flexLayout, true).EnableMouse(true)
+	// header
+	header := tview.NewBox()
+	header.SetBorder(true)
+	header.SetTitle("Header")
+	app.flexLayout.AddItem(header, 1, 1, false)
+
+	// panels
+	panels := tview.NewFlex()
+	panels.SetDirection(tview.FlexColumn)
+	panels.AddItem(app.AlphaPanel.GraphicElement(), 0, 1, false)
+	panels.AddItem(app.BetaPanel.GraphicElement(), 0, 1, false)
+	app.flexLayout.AddItem(panels, 0, 8, false)
+
+	// bottom row with F1-F12 buttons
+	app.flexLayout.AddItem(app.BottomRow.GraphicElement(), 1, 1, false)
+
+	app.pages.AddPage("mainLayout", app.flexLayout, true, true)
+	app.tviewApp.SetRoot(app.pages, true)
+	app.tviewApp.EnableMouse(true)
+
 	app.tviewApp.SetFocus(app.AlphaPanel.GraphicElement())
 	app.BottomRow.SetFilePanels(app.AlphaPanel, app.BetaPanel)
 	return nil

@@ -2,7 +2,7 @@ package controller
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
+	tview "gitlab.com/tslocum/cview"
 )
 
 // Controller defines a renderable terminal screen pane.
@@ -16,8 +16,8 @@ type Renderer interface {
 
 type GraphicElement interface {
 	tview.Primitive
-	SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *tview.Box
+	SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) // *tview.Box
 	GetInputCapture() func(event *tcell.EventKey) *tcell.EventKey
-	SetTitle(title string) *tview.Box
+	SetTitle(title string) // *tview.Box
 	GetTitle() string
 }
