@@ -9,6 +9,8 @@ import (
 	tview "gitlab.com/tslocum/cview"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // FxxController defines the bottom UI row with F1-F12 functional keys, and related properties and functions
@@ -47,7 +49,7 @@ func NewFxxController(tviewApp *tview.Application, pages *tview.Pages) (controll
 	buttonF3 := buttonFactory("F3: VIEW", nil)
 	buttonF4 := buttonFactory("F4: EDIT", nil)
 	buttonF5 := buttonFactory("F5: COPY", func() { _ = controller.F5 })
-	buttonF6 := buttonFactory("F6: HELP", func() { _ = controller.F6 })
+	buttonF6 := buttonFactory("F6: MOVE", func() { _ = controller.F6 })
 	buttonF7 := buttonFactory("F7: MKDIR", func() { _ = controller.F7 })
 	buttonF8 := buttonFactory("F8: RM", func() { _ = controller.F8 })
 	buttonF9 := buttonFactory("F9: TERM", nil)
@@ -69,6 +71,8 @@ func NewFxxController(tviewApp *tview.Application, pages *tview.Pages) (controll
 	controller.graphicElement.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		var err error
 		switch event.Key() {
+		case tcell.KeyF2:
+			err = controller.F2()
 		case tcell.KeyF5:
 			err = controller.F5()
 		case tcell.KeyF6:
@@ -156,30 +160,122 @@ func (c *FxxController) refreshFilePanel(fpc *FilePanelController) error {
 	return fpc.Render()
 }
 
+func copy(source, destination string) error {
+	var err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		var relPath string = strings.Replace(path, source, "", 1)
+		if relPath == "" {
+			return nil
+		}
+		if info.IsDir() {
+			return os.Mkdir(filepath.Join(destination, relPath), 0755)
+		} else {
+			var data, err1 = ioutil.ReadFile(filepath.Join(source, relPath))
+			if err1 != nil {
+				return err1
+			}
+			return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0777)
+		}
+	})
+	return err
+}
+
+// ignoreInput is used as a validator function
+func ignoreInput(text string, ch rune) bool {
+	return false
+}
+
+func (c *FxxController) F2() error {
+	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
+		return nil
+	}
+
+	formId := "formRename"
+	label := "Rename :"
+	currentFileName := c.sourceFilePanel.GetSelectedFileNode().Name
+	modalForm := tview.NewModal()
+	modalForm.SetBorder(true)
+	modalForm.SetTitle("Rename: " + currentFileName)
+	modalForm.SetTitleAlign(tview.AlignCenter)
+	modalForm.GetForm().AddInputField(label, currentFileName, 20, nil, nil)
+	modalForm.AddButtons([]string{"OK", "Cancel"})
+	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		switch buttonLabel {
+		case "OK":
+			sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
+			targetFileName := modalForm.GetForm().GetFormItemByLabel(label).(*tview.InputField).GetText()
+			if !strings.HasPrefix(targetFileName, "/") {
+				// assume the target directory as current one
+				pwd := c.sourceFilePanel.ftv.ModelTree.GetPwd()
+				targetFileName = pwd + string(os.PathSeparator) + targetFileName
+			}
+
+			err := os.Rename(sourceFileNode.AbsPath(), targetFileName)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			err = c.refreshFilePanel(c.sourceFilePanel)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			c.hideModalForm(formId)
+		case "Cancel":
+			c.hideModalForm(formId)
+		}
+	})
+
+	c.showModalForm(formId, modalForm)
+	return nil
+}
+
 func (c *FxxController) F5() error {
 	if c.sourceFilePanel == nil || c.targetFilePanel == nil {
 		return nil
 	}
 
-	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
-	targetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
-	targetFileName := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
+	formId := "formCopy"
+	label := "Copy :"
 
-	input, err := ioutil.ReadFile(sourceFileNode.AbsPath())
-	if err != nil {
-		return err
+	modalForm := tview.NewModal()
+	modalForm.SetBorder(true)
+	modalForm.SetTitle("Copy: " + c.sourceFilePanel.GetSelectedFileNode().Name)
+	modalForm.SetTitleAlign(tview.AlignCenter)
+
+	defaultTargetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
+	if !strings.HasSuffix(defaultTargetFolder, "/"){
+		defaultTargetFolder += string(os.PathSeparator)
 	}
+	modalForm.GetForm().AddInputField(label, defaultTargetFolder, 20, ignoreInput, nil)
 
-	err = ioutil.WriteFile(targetFileName, input, sourceFileNode.Data.FileInfo.Mode)
-	if err != nil {
-		return err
-	}
+	modalForm.AddButtons([]string{"OK", "Cancel"})
+	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		switch buttonLabel {
+		case "OK":
+			sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
+			targetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
+			if !strings.HasSuffix(targetFolder, "/") {
+				targetFolder += string(os.PathSeparator)
+			}
 
-	err = c.refreshFilePanel(c.targetFilePanel)
-	if err != nil {
-		return err
-	}
+			targetFileFqfp := targetFolder + string(os.PathSeparator) + sourceFileNode.Name
+			err := copy(sourceFileNode.AbsPath(), targetFileFqfp)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
 
+			err = c.refreshFilePanel(c.sourceFilePanel)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			c.hideModalForm(formId)
+		case "Cancel":
+			c.hideModalForm(formId)
+		}
+	})
+
+	c.showModalForm(formId, modalForm)
 	return nil
 }
 
@@ -188,26 +284,41 @@ func (c *FxxController) F6() error {
 		return nil
 	}
 
-	err := c.F5()
-	if err != nil {
-		return err
-	}
+	formId := "formMove"
+	label := "Move :"
 
-	err = c.F8()
-	if err != nil {
-		return err
-	}
+	modalForm := tview.NewModal()
+	modalForm.SetBorder(true)
+	modalForm.SetTitle("Move: " + c.sourceFilePanel.GetSelectedFileNode().AbsPath())
+	modalForm.SetTitleAlign(tview.AlignCenter)
 
-	err = c.refreshFilePanel(c.sourceFilePanel)
-	if err != nil {
-		return err
-	}
+	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
+	defaultTargetFolder := c.targetFilePanel.ftv.ModelTree.GetPwd()
+	defaultTargetFileFqfp := defaultTargetFolder + string(os.PathSeparator) + sourceFileNode.Name
+	modalForm.GetForm().AddInputField(label, defaultTargetFileFqfp, 20, nil, nil)
 
-	err = c.refreshFilePanel(c.targetFilePanel)
-	if err != nil {
-		return err
-	}
+	modalForm.AddButtons([]string{"OK", "Cancel"})
+	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+		switch buttonLabel {
+		case "OK":
+			targetFileName := modalForm.GetForm().GetFormItemByLabel(label).(*tview.InputField).GetText()
+			err := os.Rename(sourceFileNode.AbsPath(), targetFileName)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
 
+			err = c.refreshFilePanel(c.sourceFilePanel)
+			if err != nil {
+				system.MessageBus.Error(err.Error())
+			}
+
+			c.hideModalForm(formId)
+		case "Cancel":
+			c.hideModalForm(formId)
+		}
+	})
+
+	c.showModalForm(formId, modalForm)
 	return nil
 }
 
@@ -262,7 +373,7 @@ func (c *FxxController) F8() error {
 	modalForm.SetTitleAlign(tview.AlignCenter)
 
 	sourceFileNode := c.sourceFilePanel.GetSelectedFileNode()
-	modalForm.GetForm().AddInputField(label, sourceFileNode.AbsPath(), 20, func(text string, ch rune) bool {return false}, nil)
+	modalForm.GetForm().AddInputField(label, sourceFileNode.AbsPath(), 20, ignoreInput, nil)
 	modalForm.AddButtons([]string{"OK", "Cancel"})
 	modalForm.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		switch buttonLabel {
@@ -292,10 +403,10 @@ func (c *FxxController) F10() error {
 	modalWindow.SetText("Do you want to quit the application?")
 	modalWindow.AddButtons([]string{"Quit", "Cancel"})
 	modalWindow.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			if buttonLabel == "Quit" {
-				_ = c.exit()
-			}
-		})
+		if buttonLabel == "Quit" {
+			_ = c.exit()
+		}
+	})
 
 	// Display and focus the dialog
 	c.tviewApp.SetRoot(modalWindow, false)

@@ -465,8 +465,8 @@ func TestCompareWithChanges(t *testing.T) {
 	_, _, err = treeA.AddPath(chmodPath, FileInfo{
 		Fqfp: chownPath,
 		Mode: 0, // regular file,
-		Gid:  0,
-		Uid:  0,
+		Gid:  "0",
+		Uid:  "0",
 	})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
@@ -475,8 +475,8 @@ func TestCompareWithChanges(t *testing.T) {
 	_, _, err = treeB.AddPath(chmodPath, FileInfo{
 		Fqfp: chownPath,
 		Mode: 0, // regular file
-		Gid:  12,
-		Uid:  12,
+		Gid:  "12",
+		Uid:  "12",
 	})
 	if err != nil {
 		t.Errorf("could not setup test: %v", err)
